@@ -1,303 +1,260 @@
-# Architecture Guide
+﻿# Architecture Guide
 
 ## 목적
-이 문서는 이 프로젝트에서 아키텍처 관련 판단을 할 때 따라야 하는 기준을 정의한다.
-특히 NestJS 기반 백엔드에서 레이어드 아키텍처와 도메인 중심 구조를 실제로 어떻게 적용할지 명확하게 설명하는 것이 목적이다.
+이 문서는 이 프로젝트에서 사용할 구조 기준을 정리한다.
 
-이 문서는 추상적인 설명용 문서가 아니다.
-항상 실제 폴더 구조, 파일 책임, 레이어 경계 기준까지 포함해서 판단해야 한다.
+이 프로젝트는 복잡한 레이어드 아키텍처를 억지로 도입하지 않는다.
+대신 NestJS에서 흔하게 많이 쓰는 단순한 구조를 사용하고, 큰 기능 아래를 실제 기능 단위로 세분화해서 개발한다.
 
----
+핵심은 아래와 같다.
 
-## 핵심 구조 원칙
-이 프로젝트는 아래 순서로 구조를 설계한다.
-
-1. 도메인 기준으로 먼저 나눈다.
-2. 도메인 내부를 하위 기능 단위로 세분화한다.
-3. 각 하위 기능 내부에서 레이어를 분리한다.
-
-즉, 항상 아래 순서로 사고한다.
-
-`domain → sub-feature → layer`
+1. 큰 기능 폴더를 만든다.
+2. 그 안을 실제 기능 단위로 다시 나눈다.
+3. 각 기능 폴더 안에는 필요한 파일만 둔다.
+4. `module / controller / service / dto / entities` 중심으로 간다.
+5. 필요할 때만 `services / guards / decorators / interfaces / enums / utils`를 추가한다.
 
 ---
 
-## 기본 디렉터리 구조 기준
-구조를 제안하거나 파일을 만들 때는 아래 형태를 기본 기준으로 삼는다.
+## 기본 구조 기준
+이 프로젝트는 아래 같은 방향으로 간다.
 
 ```text
 src/
-  main.ts
-  app.module.ts
-
-  common/
-    exception/
-    interceptor/
-    decorator/
-    logger/
-    utils/
-
-  domains/
-    user/
-      auth/
-        presentation/
-        application/
-        domain/
-        infrastructure/
-
-      profile/
-        presentation/
-        application/
-        domain/
-        infrastructure/
-
-      permission/
-        presentation/
-        application/
-        domain/
-        infrastructure/
-
-    order/
-      creation/
-        presentation/
-        application/
-        domain/
-        infrastructure/
-
-      payment/
-        presentation/
-        application/
-        domain/
-        infrastructure/
-
-      cancel/
-        presentation/
-        application/
-        domain/
-        infrastructure/
-
-    product/
-      catalog/
-        presentation/
-        application/
-        domain/
-        infrastructure/
-
-      inventory/
-        presentation/
-        application/
-        domain/
-        infrastructure/
-
-      price/
-        presentation/
-        application/
-        domain/
-        infrastructure/
+  auth/
+    auth.module.ts
+    login/
+      dto/
+      login.controller.ts
+      login.service.ts
+    signup/
+      dto/
+      entities/
+      signup.controller.ts
+      signup.service.ts
 ```
 
-구조를 설명할 때도 반드시 이 순서가 드러나야 한다.
+즉, `auth` 같은 큰 기능 아래를 `login`, `signup`처럼 실제 기능별로 나누고, 각 기능 안은 단순하게 유지한다.
 
 ---
 
-## 레이어 역할 정의
-
-### 1. presentation
-역할:
-외부 요청과 응답을 처리하는 레이어다.
-
-포함 대상:
-- controller
-- request dto
-- response dto
-- guard
-- interceptor
-- pipe
-
-규칙:
-- 비즈니스 로직을 넣지 않는다.
-- 요청 검증, 인증/인가, 입력 변환, 응답 포맷 조정까지만 담당한다.
-- 실제 기능 실행은 application 레이어에 위임한다.
-
-### 2. application
-역할:
-유스케이스를 실행하고 흐름을 조합하는 레이어다.
-
-포함 대상:
-- use-case
-- application service
-- command / query
-- port(interface)
-
-규칙:
-- 기능 실행 순서를 조합한다.
-- domain 객체와 domain 서비스를 사용한다.
-- DB, ORM, 외부 API 같은 기술 구현 세부사항을 직접 알면 안 된다.
-
-### 3. domain
-역할:
-비즈니스 규칙의 핵심을 담는 레이어다.
-
-포함 대상:
-- entity
-- value object
-- repository interface
-- domain service
-- policy
-
-규칙:
-- 가장 중요한 비즈니스 규칙은 여기에 둔다.
-- 외부 프레임워크, DB, HTTP, ORM 구현을 몰라야 한다.
-- 가능한 한 순수한 객체와 규칙으로 유지한다.
-
-### 4. infrastructure
-역할:
-기술 구현을 담당하는 레이어다.
-
-포함 대상:
-- repository 구현체
-- ORM entity / schema
-- 외부 API client
-- persistence adapter
-
-규칙:
-- domain/application이 정의한 인터페이스를 구현한다.
-- 기술 세부 구현은 이 레이어에 격리한다.
+## 기본 원칙
+1. `presentation / application / domain / infrastructure` 같은 폴더는 사용하지 않는다.
+2. `domain` 같은 이름을 파일이나 폴더에 억지로 넣지 않는다.
+3. `auth.service.ts` 하나에 로그인, 회원가입, 토큰, 비밀번호 로직을 전부 몰아넣지 않는다.
+4. 그렇다고 처음부터 너무 잘게 쪼개지도 않는다.
+5. 수정 위치를 빨리 찾을 수 있는 구조를 우선한다.
 
 ---
 
-## 의존성 방향
-허용되는 의존성은 아래와 같다.
+## 폴더 구성 기준
+기능 폴더 안에서 사용할 수 있는 대표 폴더는 아래와 같다.
 
-- presentation → application
-- application → domain
-- infrastructure → domain, application
+- `dto`
+- `entities`
+- `services`
+- `guards`
+- `decorators`
+- `interfaces`
+- `enums`
+- `utils`
 
-금지되는 의존성은 아래와 같다.
-
-- domain → infrastructure
-- domain → presentation
-- application → presentation
-
-핵심 원칙:
-`domain`은 가장 안쪽에 있는 순수한 레이어여야 한다.
-
----
-
-## 도메인 분리 기준
-도메인을 나눌 때는 아래 질문으로 판단한다.
-
-1. 비즈니스 목적이 다른가?
-2. 변경 주기가 다른가?
-3. 책임이 다른가?
-4. 외부 의존성이 다른가?
-
-이 기준이 다르면 같은 폴더에 억지로 묶지 않는다.
+중요:
+- 위 폴더를 다 만들 필요는 없다.
+- 실제로 필요할 때만 만든다.
 
 ---
 
-## 하위 기능 분리 기준
-하나의 도메인 안에서도 아래 기준으로 하위 기능을 분리한다.
+## 파일 역할 기준
 
-1. 기능이 독립적으로 동작 가능한가?
-2. API를 분리할 수 있는가?
-3. 변경이 따로 일어나는가?
+### `*.module.ts`
+- 큰 기능을 묶는 파일이다.
+- 보통 상위 기능 폴더에 둔다.
 
 예:
+- `auth.module.ts`
+- `user.module.ts`
 
+### `*.controller.ts`
+- HTTP 요청을 받는 진입점이다.
+- 요청을 받고 service를 호출한다.
+- controller에는 비즈니스 로직을 많이 넣지 않는다.
+
+예:
+- `login.controller.ts`
+- `signup.controller.ts`
+- `profile.controller.ts`
+
+### `*.service.ts`
+- 해당 기능의 핵심 로직을 처리한다.
+- 이 프로젝트에서는 `use-case` 대신 service 중심으로 간다.
+- 서비스 이름도 기능 기준으로 나눈다.
+
+예:
+- `login.service.ts`
+- `signup.service.ts`
+- `token.service.ts`
+- `password.service.ts`
+
+### `dto/`
+- 요청 DTO, 응답 DTO를 둔다.
+- API 입력/출력 구조를 명확하게 관리한다.
+
+예:
+- `login.request.dto.ts`
+- `login.response.dto.ts`
+- `signup.request.dto.ts`
+- `signup.response.dto.ts`
+
+### `entities/`
+- TypeORM entity를 둔다.
+- DB 테이블과 직접 연결되는 모델이다.
+
+예:
+- `user.entity.ts`
+- `refresh-token.entity.ts`
+
+중요:
+- 지금은 TypeORM entity 중심으로 단순하게 간다.
+- `domain entity`, `orm entity` 이중 구조는 강제하지 않는다.
+
+### `services/`
+- 하나의 기능 폴더 안에서 서비스가 다시 나뉘기 시작할 때만 만든다.
+
+예:
+- `login.service.ts`
+- `token.service.ts`
+- `signup.service.ts`
+- `password.service.ts`
+
+### `guards/`
+- 인증/인가 guard가 필요할 때만 만든다.
+
+예:
+- `jwt-auth.guard.ts`
+- `roles.guard.ts`
+
+### `decorators/`
+- 커스텀 데코레이터가 필요할 때만 만든다.
+
+예:
+- `current-user.decorator.ts`
+- `roles.decorator.ts`
+
+### `interfaces/`
+- 타입 계약이 필요할 때만 만든다.
+
+예:
+- `jwt-payload.interface.ts`
+
+### `enums/`
+- 역할, 상태값처럼 고정된 값 묶음이 필요할 때만 만든다.
+
+예:
+- `user-role.enum.ts`
+
+### `utils/`
+- 해당 기능 안에서만 쓰는 유틸을 둔다.
+- 전역 공통이면 `common/utils`로 뺀다.
+
+---
+
+## 구조 예시
+
+### 추천 auth 구조
 ```text
-user/
+src/
   auth/
-  profile/
-  permission/
-  settings/
+    auth.module.ts
+    login/
+      dto/
+        login.request.dto.ts
+        login.response.dto.ts
+      login.controller.ts
+      login.service.ts
+    signup/
+      dto/
+        signup.request.dto.ts
+        signup.response.dto.ts
+      entities/
+        user.entity.ts
+      signup.controller.ts
+      signup.service.ts
+```
+
+### 기능이 더 커졌을 때
+```text
+src/
+  auth/
+    auth.module.ts
+    enums/
+      user-role.enum.ts
+    guards/
+      jwt-auth.guard.ts
+    interfaces/
+      jwt-payload.interface.ts
+    login/
+      dto/
+      services/
+        login.service.ts
+        token.service.ts
+      login.controller.ts
+    signup/
+      dto/
+      entities/
+      services/
+        signup.service.ts
+        password.service.ts
+      signup.controller.ts
 ```
 
 ---
 
-## 공통 모듈 분리 기준
+## 분리 기준
+처음부터 복잡하게 나누지 않는다.
+하지만 기능 경계가 분명하면 `login`, `signup`처럼 나누는 것은 기본으로 본다.
+
+아래 상황이면 한 번 더 분리한다.
+
+1. `auth` 안에서 로그인과 회원가입 책임이 분명히 다를 때
+2. `login.service.ts` 안에 토큰 로직까지 몰릴 때
+3. `signup.service.ts` 안에 비밀번호 처리 로직이 과도하게 커질 때
+4. 파일을 찾기 어려워질 때
+5. 한 파일이 너무 길어질 때
+
+즉, 기준은 아래와 같다.
+
+- 큰 기능 아래는 실제 기능별로 나눈다
+- 각 기능 안은 처음엔 단순하게 둔다
+- 그 안이 커지면 다시 세부 폴더를 추가한다
+
+---
+
+## 공통화 기준
 아무거나 `common`으로 빼지 않는다.
 
-공통으로 빼는 조건은 아래와 같다.
-
-1. 2곳 이상에서 사용된다.
-2. 의미가 완전히 동일하다.
-3. 분리했을 때 오히려 더 이해하기 쉽다.
+공통으로 빼는 조건:
+1. 두 군데 이상에서 사용한다.
+2. 의미가 완전히 같다.
+3. 빼는 것이 더 읽기 쉽다.
 
 예:
-- exception
-- logger
-- auth decorator
+- 공통 예외 처리
+- 공통 로거
+- 공통 유틸
 
 ---
 
-## 반드시 구분해야 하는 개념
-
-### domain entity vs ORM entity
-- domain entity: 비즈니스 모델
-- ORM entity: DB 구조
-
-절대 같은 것으로 취급하지 않는다.
-
-### use-case vs service
-- use-case: 하나의 기능 실행 단위
-- service: 보조 로직 또는 여러 유스케이스를 돕는 구성 요소
-
-### repository interface vs implementation
-- interface: domain 또는 application이 정의한 추상 계약
-- implementation: infrastructure가 제공하는 실제 구현
-
----
-
-## 과분리 경고
-아래 상태라면 구조가 과하게 쪼개졌을 가능성이 높다.
-
-1. 폴더만 많고 실제 로직이 거의 없다.
-2. 항상 같이 수정되는 코드가 불필요하게 떨어져 있다.
-3. 책임 경계가 오히려 더 모호하다.
-4. 어디를 수정해야 할지 찾기 어렵다.
-
-핵심 기준:
-주니어 개발자도 유지보수 가능한 구조여야 한다.
-
----
-
-## 추천 개발 흐름
-기능 구현 시 아래 순서를 우선으로 본다.
-
-1. 도메인 정의
-2. 하위 기능 분리
-3. use-case 정의
-4. domain 모델 정의
-5. infrastructure 구현
-
----
-
-## 기능 추가 체크리스트
-새 기능이나 파일을 추가하기 전에 아래를 확인한다.
-
-1. 어느 도메인인가?
-2. 기존 하위 기능에 속하는가, 새 하위 기능인가?
-3. 어느 레이어 책임인가?
-4. domain이 오염되지 않았는가?
-5. 공통화가 필요한가?
-
----
-
-## 절대 하지 말 것
-1. controller에 비즈니스 로직 넣기
-2. service 하나에 모든 책임 몰아넣기
-3. entity를 DB 모델과 동일하게 취급하기
-4. 레이어를 섞어서 구현하기
-5. 구조 판단 없이 바로 코딩하기
+## 하지 말아야 할 것
+1. 필요 없는 상위 폴더 만들기
+2. `presentation`, `application`, `domain`, `infrastructure` 같은 폴더를 억지로 도입하기
+3. 파일이 거의 없는데 폴더만 많이 만들기
+4. 구조가 있어 보이려고 복잡하게 만들기
+5. `auth.service.ts` 하나에 로그인, 회원가입, 토큰, 비밀번호 로직을 전부 몰아넣기
 
 ---
 
 ## 핵심 요약
-이 프로젝트 구조의 핵심은 아래 두 문장이다.
+이 프로젝트는 아래 방향으로 간다.
 
-`도메인 → 기능 → 레이어`
-
-그리고
-
-`domain은 절대 더럽히지 마라`
+`큰 기능 아래를 login / signup 같은 실제 기능으로 나누고, 각 기능 안은 단순하게 유지한다`
