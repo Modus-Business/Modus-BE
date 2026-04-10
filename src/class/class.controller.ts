@@ -22,7 +22,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { UserRole } from '../auth/signup/enums/user-role.enum';
-import { ApiSuccessResponse } from '../common/decorators/api-success-response.decorator';
+import { ClassService } from './class.service';
 import {
   ClassesResponseDto,
   ClassSummaryDto,
@@ -30,13 +30,18 @@ import {
 } from './dto/classes.response.dto';
 import { CreateClassRequestDto } from './dto/create-class.request.dto';
 import { CreateClassResponseDto } from './dto/create-class.response.dto';
+import { GetClassesSuccessResponseDto } from './dto/get-classes.success.response.dto';
 import { JoinClassRequestDto } from './dto/join-class.request.dto';
 import { JoinClassResponseDto } from './dto/join-class.response.dto';
 import { RegenerateClassCodeResponseDto } from './dto/regenerate-class-code.response.dto';
-import { ClassService } from './class.service';
 
 @ApiTags('classes')
-@ApiExtraModels(ClassesResponseDto, ClassSummaryDto, MyGroupDto)
+@ApiExtraModels(
+  ClassesResponseDto,
+  ClassSummaryDto,
+  MyGroupDto,
+  GetClassesSuccessResponseDto,
+)
 @ApiBearerAuth('access-token')
 @Controller('classes')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -45,10 +50,9 @@ export class ClassController {
 
   @Get()
   @ApiOperation({ summary: '메인 화면 수업 목록 조회' })
-  @ApiSuccessResponse({
-    type: ClassesResponseDto,
+  @ApiOkResponse({
     description: '학생 또는 교사의 메인 화면 수업 목록을 반환합니다.',
-    pathExample: '/classes',
+    type: GetClassesSuccessResponseDto,
   })
   async getClasses(
     @CurrentUser() currentUser: JwtPayload,
