@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
+import { RefreshToken } from './auth/login/refresh-token/entities/refresh-token.entity';
 import { User } from './auth/signup/entities/user.entity';
 
 @Module({
@@ -20,7 +21,7 @@ import { User } from './auth/signup/entities/user.entity';
         username: configService.get<string>('DB_USERNAME', 'postgres'),
         password: configService.get<string>('DB_PASSWORD', 'postgres'),
         database: configService.get<string>('DB_NAME', 'modus'),
-        entities: [User],
+        entities: [User, RefreshToken],
         synchronize: configService.get<string>('DB_SYNCHRONIZE', 'true') === 'true',
       }),
     }),

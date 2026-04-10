@@ -11,7 +11,7 @@ export class SignupController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: '회원가입 임시 엔드포인트' })
+  @ApiOperation({ summary: '회원가입' })
   async signup(@Body() request: SignupRequestDto): Promise<SignupResponseDto> {
     return this.signupService.signup(request);
   }

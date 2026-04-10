@@ -1,14 +1,21 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import { IsEmail, IsEnum, IsString, Length, Matches } from 'class-validator';
 import { UserRole } from '../enums/user-role.enum';
 
 export class SignupRequestDto {
   @ApiProperty({ example: '홍길동' })
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsString()
   @Length(2, 30)
   name!: string;
 
   @ApiProperty({ example: 'user@example.com' })
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsEmail()
   email!: string;
 
