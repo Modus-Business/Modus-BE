@@ -76,7 +76,7 @@ describe('Notice (e2e)', () => {
     await app.close();
   });
 
-  it('교강사는 공지를 작성하고 수정하고 삭제할 수 있으며 수강생은 목록과 최신 공지를 조회할 수 있다', async () => {
+  it('교강사는 공지를 작성하고 수정하고 삭제할 수 있으며 수강생은 목록을 조회할 수 있다', async () => {
     const timestamp = Date.now();
     const teacherEmail = `teacher-notice-${timestamp}@example.com`;
     const studentEmail = `student-notice-${timestamp}@example.com`;
@@ -198,17 +198,6 @@ describe('Notice (e2e)', () => {
       }),
     ]);
 
-    const latestNoticeResponse = await request(app.getHttpServer())
-      .get(`/notices/group/${groupId}/latest`)
-      .set('Authorization', `Bearer ${studentAccessToken}`)
-      .expect(200);
-
-    expect(latestNoticeResponse.body.data.notice).toEqual(
-      expect.objectContaining({
-        title: 'Updated Notice',
-      }),
-    );
-
     const deleteNoticeResponse = await request(app.getHttpServer())
       .delete(`/notices/${noticeId}`)
       .set('Authorization', `Bearer ${teacherAccessToken}`)
@@ -217,12 +206,5 @@ describe('Notice (e2e)', () => {
     expect(deleteNoticeResponse.body.data.message).toBe(
       '공지사항이 삭제되었습니다.',
     );
-
-    const latestAfterDeleteResponse = await request(app.getHttpServer())
-      .get(`/notices/group/${groupId}/latest`)
-      .set('Authorization', `Bearer ${studentAccessToken}`)
-      .expect(200);
-
-    expect(latestAfterDeleteResponse.body.data.notice).toBeNull();
   });
 });

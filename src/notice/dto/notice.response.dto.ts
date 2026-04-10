@@ -23,8 +23,3 @@ export class NoticeListResponseDto {
   @ApiProperty({ type: [NoticeItemDto] })
   notices!: NoticeItemDto[];
 }
-
-export class NoticeLatestResponseDto {
-  @ApiProperty({ type: NoticeItemDto, nullable: true })
-  notice!: NoticeItemDto | null;
-}

@@ -15,11 +15,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { CreateNoticeRequestDto } from './dto/create-notice.request.dto';
 import { DeleteNoticeResponseDto } from './dto/delete-notice.response.dto';
-import {
-  NoticeItemDto,
-  NoticeLatestResponseDto,
-  NoticeListResponseDto,
-} from './dto/notice.response.dto';
+import { NoticeItemDto, NoticeListResponseDto } from './dto/notice.response.dto';
 import { UpdateNoticeRequestDto } from './dto/update-notice.request.dto';
 import { NoticeService } from './notice.service';
 
@@ -64,14 +60,5 @@ export class NoticeController {
     @Param('groupId', new ParseUUIDPipe()) groupId: string,
   ): Promise<NoticeListResponseDto> {
     return this.noticeService.getNoticesByGroup(currentUser, groupId);
-  }
-
-  @Get('group/:groupId/latest')
-  @ApiOperation({ summary: '모둠 최신 공지 조회' })
-  async getLatestNotice(
-    @CurrentUser() currentUser: JwtPayload,
-    @Param('groupId', new ParseUUIDPipe()) groupId: string,
-  ): Promise<NoticeLatestResponseDto> {
-    return this.noticeService.getLatestNotice(currentUser, groupId);
   }
 }

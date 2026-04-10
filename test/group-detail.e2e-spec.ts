@@ -8,9 +8,9 @@ import { AppModule } from '../src/app.module';
 import { UserRole } from '../src/auth/signup/enums/user-role.enum';
 import { User } from '../src/auth/signup/entities/user.entity';
 import { Classroom } from '../src/class/entities/class.entity';
-import { Group } from '../src/group/entities/group.entity';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { ResponseInterceptor } from '../src/common/interceptors/response.interceptor';
+import { Group } from '../src/group/entities/group.entity';
 
 describe('Group Detail (e2e)', () => {
   let app: INestApplication<App>;
@@ -63,7 +63,7 @@ describe('Group Detail (e2e)', () => {
     await app.close();
   });
 
-  it('수강생은 모둠 상세에서 익명 표시명을 받고 교강사는 실명을 받는다', async () => {
+  it('returns anonymous group nicknames to student and real names to teacher', async () => {
     const timestamp = Date.now();
     const teacherEmail = `teacher-group-detail-${timestamp}@example.com`;
     const studentEmail = `student-group-detail-${timestamp}@example.com`;
@@ -151,13 +151,15 @@ describe('Group Detail (e2e)', () => {
       .set('Authorization', `Bearer ${studentAccessToken}`)
       .expect(200);
 
-    expect(studentDetailResponse.body.data.members).toEqual([
-      {
-        groupMemberId: expect.any(String),
-        displayName: '모둠원 1',
-        isMe: true,
-      },
-    ]);
+    expect(studentDetailResponse.body.data.members).toHaveLength(1);
+    expect(studentDetailResponse.body.data.members[0]).toEqual({
+      groupMemberId: expect.any(String),
+      displayName: expect.any(String),
+      isMe: true,
+    });
+    expect(studentDetailResponse.body.data.members[0].displayName).not.toBe(
+      '최민수',
+    );
 
     const teacherDetailResponse = await request(app.getHttpServer())
       .get(`/groups/${groupId}`)

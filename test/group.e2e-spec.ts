@@ -8,9 +8,9 @@ import { AppModule } from '../src/app.module';
 import { UserRole } from '../src/auth/signup/enums/user-role.enum';
 import { User } from '../src/auth/signup/entities/user.entity';
 import { Classroom } from '../src/class/entities/class.entity';
-import { Group } from '../src/group/entities/group.entity';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { ResponseInterceptor } from '../src/common/interceptors/response.interceptor';
+import { Group } from '../src/group/entities/group.entity';
 
 describe('Group (e2e)', () => {
   let app: INestApplication<App>;
@@ -18,7 +18,6 @@ describe('Group (e2e)', () => {
   let classroomRepository: Repository<Classroom>;
   let groupRepository: Repository<Group>;
   const createdEmails: string[] = [];
-  const createdTeacherIds: string[] = [];
   const createdClassIds: string[] = [];
 
   beforeAll(async () => {
@@ -64,7 +63,7 @@ describe('Group (e2e)', () => {
     await app.close();
   });
 
-  it('교강사가 모둠을 만들면 수강생은 내 모둠 정보를 조회할 수 있다', async () => {
+  it('regenerates a student nickname when the student leaves a group and joins another one', async () => {
     const timestamp = Date.now();
     const teacherEmail = `teacher-group-e2e-${timestamp}@example.com`;
     const studentEmail = `student-group-e2e-${timestamp}@example.com`;
@@ -107,18 +106,13 @@ describe('Group (e2e)', () => {
       .set('Authorization', `Bearer ${teacherAccessToken}`)
       .send({
         name: '프로덕트 스튜디오',
-        description: '서비스 구조 설계와 퍼블리싱을 함께 진행하는 메인 실습 수업',
+        description: '메인 실습 수업',
       })
       .expect(201);
 
     const classId = createClassResponse.body.data.classId as string;
     const classCode = createClassResponse.body.data.classCode as string;
     createdClassIds.push(classId);
-
-    const teacher = await userRepository.findOneByOrFail({
-      email: teacherEmail,
-    });
-    createdTeacherIds.push(teacher.userId);
 
     const student = await userRepository.findOneByOrFail({
       email: studentEmail,
@@ -142,7 +136,7 @@ describe('Group (e2e)', () => {
       })
       .expect(201);
 
-    const createGroupResponse = await request(app.getHttpServer())
+    const createFirstGroupResponse = await request(app.getHttpServer())
       .post('/groups')
       .set('Authorization', `Bearer ${teacherAccessToken}`)
       .send({
@@ -152,39 +146,56 @@ describe('Group (e2e)', () => {
       })
       .expect(201);
 
-    expect(createGroupResponse.body.success).toBe(true);
-    expect(createGroupResponse.body.data.memberCount).toBe(1);
+    const firstGroupId = createFirstGroupResponse.body.data.groupId as string;
 
-    const myGroupResponse = await request(app.getHttpServer())
+    const firstGroupDetailResponse = await request(app.getHttpServer())
+      .get(`/groups/${firstGroupId}`)
+      .set('Authorization', `Bearer ${studentAccessToken}`)
+      .expect(200);
+
+    const firstNickname =
+      firstGroupDetailResponse.body.data.members[0].displayName as string;
+
+    await request(app.getHttpServer())
+      .patch(`/groups/${firstGroupId}`)
+      .set('Authorization', `Bearer ${teacherAccessToken}`)
+      .send({
+        name: '모둠 3',
+        studentIds: [],
+      })
+      .expect(200);
+
+    const emptyMyGroupResponse = await request(app.getHttpServer())
       .get(`/groups/my/${classId}`)
       .set('Authorization', `Bearer ${studentAccessToken}`)
       .expect(200);
 
-    expect(myGroupResponse.body.success).toBe(true);
-    expect(myGroupResponse.body.data).toEqual({
-      hasGroup: true,
-      group: {
-        groupId: expect.any(String),
-        classId,
-        name: '모둠 3',
-        memberCount: 1,
-      },
-      message: null,
+    expect(emptyMyGroupResponse.body.data).toEqual({
+      hasGroup: false,
+      group: null,
+      message: '참여 중인 모둠이 없습니다.',
     });
 
-    const studentClassesResponse = await request(app.getHttpServer())
-      .get('/classes')
+    const createSecondGroupResponse = await request(app.getHttpServer())
+      .post('/groups')
+      .set('Authorization', `Bearer ${teacherAccessToken}`)
+      .send({
+        classId,
+        name: '모둠 4',
+        studentIds: [student.userId],
+      })
+      .expect(201);
+
+    const secondGroupId = createSecondGroupResponse.body.data.groupId as string;
+
+    const secondGroupDetailResponse = await request(app.getHttpServer())
+      .get(`/groups/${secondGroupId}`)
       .set('Authorization', `Bearer ${studentAccessToken}`)
       .expect(200);
 
-    expect(studentClassesResponse.body.data.classes).toEqual([
-      expect.objectContaining({
-        classId,
-        myGroup: {
-          groupId: myGroupResponse.body.data.group.groupId,
-          name: '모둠 3',
-        },
-      }),
-    ]);
+    const secondNickname =
+      secondGroupDetailResponse.body.data.members[0].displayName as string;
+
+    expect(firstNickname).not.toBe(secondNickname);
   });
 });

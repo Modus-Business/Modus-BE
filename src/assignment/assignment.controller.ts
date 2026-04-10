@@ -42,15 +42,6 @@ export class AssignmentController {
     return this.assignmentService.getMySubmission(currentUser, groupId);
   }
 
-  @Get('group/:groupId')
-  @ApiOperation({ summary: '교강사 모둠 제출 여부 조회' })
-  async getGroupSubmissionStatus(
-    @CurrentUser() currentUser: JwtPayload,
-    @Param('groupId', new ParseUUIDPipe()) groupId: string,
-  ): Promise<AssignmentSubmissionStatusListResponseDto> {
-    return this.assignmentService.getGroupSubmissionStatus(currentUser, groupId);
-  }
-
   @Get('class/:classId')
   @ApiOperation({ summary: '교강사 수업 모둠별 제출 여부 조회' })
   async getClassSubmissionStatuses(

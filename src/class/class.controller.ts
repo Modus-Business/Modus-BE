@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Patch,
   Param,
   ParseUUIDPipe,
   Post,
@@ -42,7 +43,7 @@ export class ClassController {
     return this.classService.createClass(currentUser, request);
   }
 
-  @Post(':classId/code/regenerate')
+  @Patch(':classId/code')
   @ApiOperation({ summary: '교강사 수업 코드 재발급' })
   async regenerateClassCode(
     @CurrentUser() currentUser: JwtPayload,

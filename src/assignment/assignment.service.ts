@@ -89,36 +89,6 @@ export class AssignmentService {
     return submission ? this.toSubmissionItem(submission) : null;
   }
 
-  async getGroupSubmissionStatus(
-    currentUser: JwtPayload,
-    groupId: string,
-  ): Promise<AssignmentSubmissionStatusListResponseDto> {
-    if (currentUser.role !== UserRole.TEACHER) {
-      throw new ForbiddenException('교강사만 모둠 제출 여부를 조회할 수 있습니다.');
-    }
-
-    const group = await this.getTeacherOwnedGroup(currentUser, groupId);
-    const submission = await this.assignmentSubmissionRepository.findOne({
-      where: {
-        groupId,
-      },
-    });
-
-    return {
-      submissions: [
-        {
-          groupId: group.groupId,
-          groupName: group.name,
-          isSubmitted: !!submission,
-          submissionId: submission?.submissionId ?? null,
-          fileUrl: submission?.fileUrl ?? null,
-          link: submission?.link ?? null,
-          submittedAt: submission?.submittedAt ?? null,
-        },
-      ],
-    };
-  }
-
   async getClassSubmissionStatuses(
     currentUser: JwtPayload,
     classId: string,
@@ -207,32 +177,6 @@ export class AssignmentService {
 
     if (!isMember) {
       throw new ForbiddenException('본인이 속한 모둠만 제출할 수 있습니다.');
-    }
-
-    return group;
-  }
-
-  private async getTeacherOwnedGroup(
-    currentUser: JwtPayload,
-    groupId: string,
-  ): Promise<Group> {
-    const group = await this.groupRepository.findOne({
-      where: {
-        groupId,
-      },
-      relations: {
-        classroom: true,
-      },
-    });
-
-    if (!group) {
-      throw new NotFoundException('해당 모둠을 찾을 수 없습니다.');
-    }
-
-    if (group.classroom.teacherId !== currentUser.sub) {
-      throw new ForbiddenException(
-        '본인이 만든 수업의 모둠 제출 여부만 조회할 수 있습니다.',
-      );
     }
 
     return group;

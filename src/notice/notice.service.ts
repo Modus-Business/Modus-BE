@@ -10,11 +10,7 @@ import { UserRole } from '../auth/signup/enums/user-role.enum';
 import { Group } from '../group/entities/group.entity';
 import { CreateNoticeRequestDto } from './dto/create-notice.request.dto';
 import { DeleteNoticeResponseDto } from './dto/delete-notice.response.dto';
-import {
-  NoticeItemDto,
-  NoticeLatestResponseDto,
-  NoticeListResponseDto,
-} from './dto/notice.response.dto';
+import { NoticeItemDto, NoticeListResponseDto } from './dto/notice.response.dto';
 import { UpdateNoticeRequestDto } from './dto/update-notice.request.dto';
 import { Notice } from './entities/notice.entity';
 
@@ -92,26 +88,6 @@ export class NoticeService {
 
     return {
       notices: notices.map((notice) => this.toNoticeItem(notice)),
-    };
-  }
-
-  async getLatestNotice(
-    currentUser: JwtPayload,
-    groupId: string,
-  ): Promise<NoticeLatestResponseDto> {
-    await this.getAccessibleGroup(currentUser, groupId);
-
-    const latestNotice = await this.noticeRepository.findOne({
-      where: {
-        groupId,
-      },
-      order: {
-        createdAt: 'DESC',
-      },
-    });
-
-    return {
-      notice: latestNotice ? this.toNoticeItem(latestNotice) : null,
     };
   }
 

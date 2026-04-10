@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { Classroom } from '../../class/entities/class.entity';
 import { GroupMember } from './group-member.entity';
+import { GroupNickname } from './group-nickname.entity';
 
 @Entity({ name: 'groups' })
 export class Group {
@@ -36,4 +37,7 @@ export class Group {
 
   @OneToMany(() => GroupMember, (groupMember) => groupMember.group)
   groupMembers!: GroupMember[];
+
+  @OneToMany(() => GroupNickname, (groupNickname) => groupNickname.group)
+  groupNicknames!: GroupNickname[];
 }

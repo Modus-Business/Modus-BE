@@ -114,9 +114,9 @@ describe('Class (e2e)', () => {
     const classId = createClassResponse.body.data.classId as string;
 
     const regenerateCodeResponse = await request(app.getHttpServer())
-      .post(`/classes/${classId}/code/regenerate`)
+      .patch(`/classes/${classId}/code`)
       .set('Authorization', `Bearer ${teacherAccessToken}`)
-      .expect(201);
+      .expect(200);
 
     expect(regenerateCodeResponse.body.success).toBe(true);
     expect(regenerateCodeResponse.body.data.classCode).toMatch(

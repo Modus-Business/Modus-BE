@@ -7,11 +7,18 @@ import { GroupController } from './group.controller';
 import { GroupService } from './group.service';
 import { Group } from './entities/group.entity';
 import { GroupMember } from './entities/group-member.entity';
+import { GroupNickname } from './entities/group-nickname.entity';
 
 @Module({
   imports: [
     AuthModule,
-    TypeOrmModule.forFeature([Classroom, ClassParticipant, Group, GroupMember]),
+    TypeOrmModule.forFeature([
+      Classroom,
+      ClassParticipant,
+      Group,
+      GroupMember,
+      GroupNickname,
+    ]),
   ],
   controllers: [GroupController],
   providers: [GroupService],

@@ -2,7 +2,11 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { EmailController } from './email/email.controller';
+import { EmailVerification } from './email/entities/email-verification.entity';
+import { EmailVerificationService } from './email/email-verification.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { EmailSenderService } from './email/email-sender.service';
 import { LoginController } from './login/login.controller';
 import { LoginService } from './login/login.service';
 import { RefreshToken } from './login/refresh-token/entities/refresh-token.entity';
@@ -18,7 +22,7 @@ import { User } from './signup/entities/user.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, RefreshToken]),
+    TypeOrmModule.forFeature([User, RefreshToken, EmailVerification]),
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
@@ -34,7 +38,12 @@ import { User } from './signup/entities/user.entity';
       },
     }),
   ],
-  controllers: [LoginController, LogoutController, SignupController],
+  controllers: [
+    LoginController,
+    LogoutController,
+    SignupController,
+    EmailController,
+  ],
   providers: [
     JwtAuthGuard,
     LoginService,
@@ -44,7 +53,14 @@ import { User } from './signup/entities/user.entity';
     RefreshTokenService,
     RefreshService,
     LogoutService,
+    EmailSenderService,
+    EmailVerificationService,
   ],
-  exports: [JwtAuthGuard, TokenService],
+  exports: [
+    JwtAuthGuard,
+    TokenService,
+    EmailSenderService,
+    EmailVerificationService,
+  ],
 })
 export class AuthModule {}

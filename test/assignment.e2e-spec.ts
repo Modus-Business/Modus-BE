@@ -78,7 +78,7 @@ describe('Assignment (e2e)', () => {
     await app.close();
   });
 
-  it('수강생은 결과물을 제출하고 교강사는 제출 여부를 조회할 수 있다', async () => {
+  it('수강생은 결과물을 제출하고 교강사는 수업 기준 제출 여부를 조회할 수 있다', async () => {
     const timestamp = Date.now();
     const teacherEmail = `teacher-assignment-${timestamp}@example.com`;
     const studentEmail = `student-assignment-${timestamp}@example.com`;

@@ -82,8 +82,9 @@ describe('ClassService', () => {
             groupMembers: [],
           },
           classParticipant: undefined as never,
+          groupNickname: null,
         },
-      } as ClassParticipant,
+      } as unknown as ClassParticipant,
     ]);
 
     const result = await classService.getClasses({

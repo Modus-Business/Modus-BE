@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -178,36 +178,6 @@ describe('NoticeService', () => {
     expect(result.notices).toHaveLength(1);
   });
 
-  it('공지가 없으면 최신 공지는 null이다', async () => {
-    groupRepository.findOne.mockResolvedValue({
-      groupId: 'group-1',
-      classId: 'class-1',
-      name: '모둠 3',
-      classroom: {
-        teacherId: 'teacher-1',
-      },
-      groupMembers: [
-        {
-          classParticipant: {
-            studentId: 'student-1',
-          },
-        },
-      ],
-    } as unknown as Group);
-    noticeRepository.findOne.mockResolvedValue(null);
-
-    const result = await noticeService.getLatestNotice(
-      {
-        sub: 'student-1',
-        email: 'student@example.com',
-        role: UserRole.STUDENT,
-      },
-      '11111111-1111-1111-1111-111111111111',
-    );
-
-    expect(result.notice).toBeNull();
-  });
-
   it('본인 모둠이 아니면 수강생은 공지에 접근할 수 없다', async () => {
     groupRepository.findOne.mockResolvedValue({
       groupId: 'group-1',
@@ -231,18 +201,4 @@ describe('NoticeService', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('없는 모둠이면 NotFoundException을 던진다', async () => {
-    groupRepository.findOne.mockResolvedValue(null);
-
-    await expect(
-      noticeService.getLatestNotice(
-        {
-          sub: 'teacher-1',
-          email: 'teacher@example.com',
-          role: UserRole.TEACHER,
-        },
-        '11111111-1111-1111-1111-111111111111',
-      ),
-    ).rejects.toBeInstanceOf(NotFoundException);
-  });
 });
