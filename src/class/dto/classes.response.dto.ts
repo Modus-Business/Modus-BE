@@ -46,8 +46,30 @@ export class ClassSummaryDto {
 
 export class ClassesResponseDto {
   @ApiProperty({
-    type: ClassSummaryDto,
-    isArray: true,
+    type: [ClassSummaryDto],
+    example: [
+      {
+        classId: '0a11d54c-c75a-4d10-a4a0-1fd224c636c7',
+        name: '프로덕트 스튜디오',
+        description: '서비스 구조 설계와 퍼블리싱을 함께 진행하는 메인 실습 수업',
+        classCode: null,
+        studentCount: null,
+        createdAt: '2026-04-10T12:00:00.000Z',
+        myGroup: {
+          groupId: '3f4d3db1-6dd7-4e1c-b34e-78f76bdcd001',
+          name: '모둠 3',
+        },
+      },
+      {
+        classId: '9fdad8a7-5f45-4a4f-b6b1-26e0714d45d0',
+        name: '디자인 라이팅 워크숍',
+        description: '텍스트 톤앤매너와 설명형 UI 문구를 다듬는 보조 워크숍',
+        classCode: null,
+        studentCount: null,
+        createdAt: '2026-04-09T09:00:00.000Z',
+        myGroup: null,
+      },
+    ],
   })
   classes!: ClassSummaryDto[];
 }

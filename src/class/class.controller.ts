@@ -2,13 +2,19 @@ import {
   Body,
   Controller,
   Get,
-  Patch,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -32,6 +38,10 @@ export class ClassController {
 
   @Get()
   @ApiOperation({ summary: '메인 화면 수업 목록 조회' })
+  @ApiOkResponse({
+    description: '학생 또는 교강사의 메인 화면 수업 목록을 반환합니다.',
+    type: ClassesResponseDto,
+  })
   async getClasses(
     @CurrentUser() currentUser: JwtPayload,
   ): Promise<ClassesResponseDto> {
@@ -41,6 +51,10 @@ export class ClassController {
   @Post()
   @Roles(UserRole.TEACHER)
   @ApiOperation({ summary: '교강사 수업 생성' })
+  @ApiCreatedResponse({
+    description: '새 수업을 생성하고 수업 코드를 반환합니다.',
+    type: CreateClassResponseDto,
+  })
   async createClass(
     @CurrentUser() currentUser: JwtPayload,
     @Body() request: CreateClassRequestDto,
@@ -51,6 +65,10 @@ export class ClassController {
   @Patch(':classId/code')
   @Roles(UserRole.TEACHER)
   @ApiOperation({ summary: '교강사 수업 코드 재발급' })
+  @ApiOkResponse({
+    description: '수업 코드를 새 값으로 재발급합니다.',
+    type: RegenerateClassCodeResponseDto,
+  })
   async regenerateClassCode(
     @CurrentUser() currentUser: JwtPayload,
     @Param('classId', new ParseUUIDPipe()) classId: string,
@@ -61,6 +79,10 @@ export class ClassController {
   @Post('join')
   @Roles(UserRole.STUDENT)
   @ApiOperation({ summary: '수강생 수업 참여' })
+  @ApiCreatedResponse({
+    description: '수업 코드로 수업에 참여합니다.',
+    type: JoinClassResponseDto,
+  })
   async joinClass(
     @CurrentUser() currentUser: JwtPayload,
     @Body() request: JoinClassRequestDto,
