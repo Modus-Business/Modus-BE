@@ -20,7 +20,7 @@ export class SignupRequestDto {
   @IsString()
   @Length(8, 30)
   @Matches(/^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/, {
-    message: 'password must include letters, numbers, and special characters',
+    message: '비밀번호는 영문, 숫자, 특수문자를 포함해야 합니다.',
   })
   password!: string;
 

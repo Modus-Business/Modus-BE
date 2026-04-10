@@ -11,7 +11,7 @@ export class LoginController {
 
   @Post()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Login placeholder endpoint' })
+  @ApiOperation({ summary: '로그인 임시 엔드포인트' })
   login(@Body() request: LoginRequestDto): LoginResponseDto {
     return this.loginService.login(request);
   }
