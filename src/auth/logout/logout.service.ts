@@ -16,7 +16,7 @@ export class LogoutService {
     await this.refreshTokenService.remove(payload.sub);
 
     return {
-      message: '로그아웃되었습니다.',
+      message: '로그아웃했습니다.',
     };
   }
 }

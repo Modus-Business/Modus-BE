@@ -30,7 +30,7 @@ export class EmailSenderService {
           <div style="margin: 24px 0; padding: 16px 20px; border-radius: 12px; background: #eff6ff; font-size: 28px; font-weight: 700; letter-spacing: 6px; width: fit-content;">
             ${code}
           </div>
-          <p>본인이 요청하지 않았다면 이 메일을 무시해 주세요.</p>
+          <p>본인이 요청하지 않았다면 이 메일은 무시해 주세요.</p>
         </div>
       `,
     });

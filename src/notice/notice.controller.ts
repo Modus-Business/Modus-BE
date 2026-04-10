@@ -9,10 +9,13 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { UserRole } from '../auth/signup/enums/user-role.enum';
 import { CreateNoticeRequestDto } from './dto/create-notice.request.dto';
 import { DeleteNoticeResponseDto } from './dto/delete-notice.response.dto';
 import { NoticeItemDto, NoticeListResponseDto } from './dto/notice.response.dto';
@@ -20,12 +23,14 @@ import { UpdateNoticeRequestDto } from './dto/update-notice.request.dto';
 import { NoticeService } from './notice.service';
 
 @ApiTags('notices')
+@ApiBearerAuth('access-token')
 @Controller('notices')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class NoticeController {
   constructor(private readonly noticeService: NoticeService) {}
 
   @Post()
+  @Roles(UserRole.TEACHER)
   @ApiOperation({ summary: '교강사 공지 작성' })
   async createNotice(
     @CurrentUser() currentUser: JwtPayload,
@@ -35,6 +40,7 @@ export class NoticeController {
   }
 
   @Patch(':noticeId')
+  @Roles(UserRole.TEACHER)
   @ApiOperation({ summary: '교강사 공지 수정' })
   async updateNotice(
     @CurrentUser() currentUser: JwtPayload,
@@ -45,6 +51,7 @@ export class NoticeController {
   }
 
   @Delete(':noticeId')
+  @Roles(UserRole.TEACHER)
   @ApiOperation({ summary: '교강사 공지 삭제' })
   async deleteNotice(
     @CurrentUser() currentUser: JwtPayload,

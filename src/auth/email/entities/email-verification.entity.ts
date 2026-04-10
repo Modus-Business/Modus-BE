@@ -25,6 +25,20 @@ export class EmailVerification {
   @Column({ type: 'timestamp', name: 'expires_at' })
   expiresAt!: Date;
 
+  @Column({
+    type: 'timestamp',
+    name: 'last_sent_at',
+    nullable: true,
+  })
+  lastSentAt!: Date | null;
+
+  @Column({
+    type: 'int',
+    name: 'failed_attempt_count',
+    default: 0,
+  })
+  failedAttemptCount!: number;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 

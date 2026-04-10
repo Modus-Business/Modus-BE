@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { randomInt } from 'node:crypto';
 import { Repository } from 'typeorm';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { UserRole } from '../auth/signup/enums/user-role.enum';
@@ -88,7 +89,7 @@ export class ClassService {
 
     if (classroom.teacherId !== currentUser.sub) {
       throw new ForbiddenException(
-        '본인이 만든 수업의 코드만 재발급할 수 있습니다.',
+        '본인이 만든 수업 코드만 재발급할 수 있습니다.',
       );
     }
 
@@ -249,9 +250,7 @@ export class ClassService {
 
   private generateClassCodeBlock(): string {
     return Array.from({ length: CLASS_CODE_BLOCK_LENGTH }, () => {
-      const randomIndex = Math.floor(
-        Math.random() * CLASS_CODE_CHARACTERS.length,
-      );
+      const randomIndex = randomInt(0, CLASS_CODE_CHARACTERS.length);
 
       return CLASS_CODE_CHARACTERS[randomIndex];
     }).join('');

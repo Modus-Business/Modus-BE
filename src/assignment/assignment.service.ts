@@ -10,12 +10,12 @@ import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { UserRole } from '../auth/signup/enums/user-role.enum';
 import { Classroom } from '../class/entities/class.entity';
 import { Group } from '../group/entities/group.entity';
-import { AssignmentSubmission } from './entities/assignment-submission.entity';
 import {
   AssignmentSubmissionItemDto,
   AssignmentSubmissionStatusListResponseDto,
 } from './dto/assignment-submission.response.dto';
 import { SubmitAssignmentRequestDto } from './dto/submit-assignment.request.dto';
+import { AssignmentSubmission } from './entities/assignment-submission.entity';
 
 @Injectable()
 export class AssignmentService {
@@ -95,7 +95,7 @@ export class AssignmentService {
   ): Promise<AssignmentSubmissionStatusListResponseDto> {
     if (currentUser.role !== UserRole.TEACHER) {
       throw new ForbiddenException(
-        '교강사만 수업별 제출 여부를 조회할 수 있습니다.',
+        '교강사만 수업별 제출 현황을 조회할 수 있습니다.',
       );
     }
 
@@ -114,7 +114,7 @@ export class AssignmentService {
 
     if (classroom.teacherId !== currentUser.sub) {
       throw new ForbiddenException(
-        '본인이 만든 수업의 제출 여부만 조회할 수 있습니다.',
+        '본인이 만든 수업의 제출 현황만 조회할 수 있습니다.',
       );
     }
 

@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { randomInt } from 'node:crypto';
 import { In, Repository } from 'typeorm';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { UserRole } from '../auth/signup/enums/user-role.enum';
@@ -22,12 +23,12 @@ import { GroupNickname } from './entities/group-nickname.entity';
 import { Group } from './entities/group.entity';
 
 const GROUP_NICKNAME_ADJECTIVES = [
-  '푸른',
+  '빠른',
   '조용한',
   '반짝이는',
   '단단한',
-  '재빠른',
-  '은은한',
+  '부드러운',
+  '담대한',
   '기민한',
   '영리한',
   '차분한',
@@ -35,16 +36,16 @@ const GROUP_NICKNAME_ADJECTIVES = [
 ];
 
 const GROUP_NICKNAME_NOUNS = [
-  '나침반',
   '파도',
   '별빛',
-  '연필',
-  '등대',
+  '산호',
+  '새벽',
+  '유성',
   '메아리',
   '고래',
   '구름',
   '호수',
-  '새벽',
+  '은하',
 ];
 
 @Injectable()
@@ -67,9 +68,7 @@ export class GroupService {
     request: CreateGroupRequestDto,
   ): Promise<CreateGroupResponseDto> {
     if (currentUser.role !== UserRole.TEACHER) {
-      throw new ForbiddenException(
-        '교강사만 모둠을 생성할 수 있습니다.',
-      );
+      throw new ForbiddenException('교강사만 모둠을 생성할 수 있습니다.');
     }
 
     const classroom = await this.classroomRepository.findOne({
@@ -104,25 +103,7 @@ export class GroupService {
     const savedGroup = await this.groupRepository.save(group);
 
     if (participants.length > 0) {
-      const groupMembers = participants.map((classParticipant) =>
-        this.groupMemberRepository.create({
-          groupId: savedGroup.groupId,
-          classParticipantId: classParticipant.classParticipantId,
-        }),
-      );
-      const savedGroupMembers = await this.groupMemberRepository.save(
-        groupMembers,
-      );
-      const usedNicknames = new Set<string>();
-      const groupNicknames = savedGroupMembers.map((groupMember) =>
-        this.groupNicknameRepository.create({
-          groupId: savedGroup.groupId,
-          groupMemberId: groupMember.groupMemberId,
-          nickname: this.generateUniqueNickname(usedNicknames),
-        }),
-      );
-
-      await this.groupNicknameRepository.save(groupNicknames);
+      await this.addParticipantsToGroup(savedGroup.groupId, participants, new Set());
     }
 
     return {
@@ -196,24 +177,7 @@ export class GroupService {
     );
 
     if (participantsToAdd.length > 0) {
-      const groupMembersToAdd = participantsToAdd.map((classParticipant) =>
-        this.groupMemberRepository.create({
-          groupId,
-          classParticipantId: classParticipant.classParticipantId,
-        }),
-      );
-      const savedGroupMembers = await this.groupMemberRepository.save(
-        groupMembersToAdd,
-      );
-      const groupNicknames = savedGroupMembers.map((groupMember) =>
-        this.groupNicknameRepository.create({
-          groupId,
-          groupMemberId: groupMember.groupMemberId,
-          nickname: this.generateUniqueNickname(usedNicknames),
-        }),
-      );
-
-      await this.groupNicknameRepository.save(groupNicknames);
+      await this.addParticipantsToGroup(groupId, participantsToAdd, usedNicknames);
     }
 
     group.name = request.name.trim();
@@ -243,7 +207,7 @@ export class GroupService {
     await this.groupRepository.remove(group);
 
     return {
-      message: '모둠이 삭제되었습니다.',
+      message: '모둠을 삭제했습니다.',
     };
   }
 
@@ -252,9 +216,7 @@ export class GroupService {
     classId: string,
   ): Promise<GroupListResponseDto> {
     if (currentUser.role !== UserRole.TEACHER) {
-      throw new ForbiddenException(
-        '교강사만 모둠 목록을 조회할 수 있습니다.',
-      );
+      throw new ForbiddenException('교강사만 모둠 목록을 조회할 수 있습니다.');
     }
 
     const classroom = await this.classroomRepository.findOne({
@@ -419,6 +381,29 @@ export class GroupService {
     throw new ForbiddenException('지원하지 않는 사용자 역할입니다.');
   }
 
+  private async addParticipantsToGroup(
+    groupId: string,
+    participants: ClassParticipant[],
+    usedNicknames: Set<string>,
+  ): Promise<void> {
+    const groupMembers = participants.map((classParticipant) =>
+      this.groupMemberRepository.create({
+        groupId,
+        classParticipantId: classParticipant.classParticipantId,
+      }),
+    );
+    const savedGroupMembers = await this.groupMemberRepository.save(groupMembers);
+    const groupNicknames = savedGroupMembers.map((groupMember) =>
+      this.groupNicknameRepository.create({
+        groupId,
+        groupMemberId: groupMember.groupMemberId,
+        nickname: this.generateUniqueNickname(usedNicknames),
+      }),
+    );
+
+    await this.groupNicknameRepository.save(groupNicknames);
+  }
+
   private generateUniqueNickname(usedNicknames: Set<string>): string {
     const totalCombinationCount =
       GROUP_NICKNAME_ADJECTIVES.length * GROUP_NICKNAME_NOUNS.length;
@@ -446,9 +431,7 @@ export class GroupService {
   }
 
   private pickRandom(values: string[]): string {
-    const randomIndex = Math.floor(Math.random() * values.length);
-
-    return values[randomIndex];
+    return values[randomInt(0, values.length)];
   }
 
   private async getTeacherOwnedGroup(
@@ -520,7 +503,7 @@ export class GroupService {
 
     if (existingGroupMembers.length > 0) {
       throw new ConflictException(
-        '이미 다른 모둠에 배정된 학생이 있습니다.',
+        '이미 다른 모둠에 배정된 학생이 포함되어 있습니다.',
       );
     }
   }

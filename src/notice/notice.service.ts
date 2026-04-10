@@ -67,7 +67,7 @@ export class NoticeService {
     await this.noticeRepository.remove(notice);
 
     return {
-      message: '공지사항이 삭제되었습니다.',
+      message: '공지사항을 삭제했습니다.',
     };
   }
 
@@ -96,7 +96,9 @@ export class NoticeService {
     noticeId: string,
   ): Promise<Notice> {
     if (currentUser.role !== UserRole.TEACHER) {
-      throw new ForbiddenException('교강사만 공지를 수정하거나 삭제할 수 있습니다.');
+      throw new ForbiddenException(
+        '교강사만 공지를 수정하거나 삭제할 수 있습니다.',
+      );
     }
 
     const notice = await this.noticeRepository.findOne({
@@ -116,7 +118,7 @@ export class NoticeService {
 
     if (notice.group.classroom.teacherId !== currentUser.sub) {
       throw new ForbiddenException(
-        '본인이 만든 수업의 공지만 수정하거나 삭제할 수 있습니다.',
+        '본인이 만든 수업 공지만 수정하거나 삭제할 수 있습니다.',
       );
     }
 

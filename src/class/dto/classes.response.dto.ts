@@ -1,7 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 export class MyGroupDto {
-  @ApiProperty({ example: '3f4d3db1-6dd7-4e1c-b34e-78f76bdcd001', nullable: true })
+  @ApiProperty({
+    example: '3f4d3db1-6dd7-4e1c-b34e-78f76bdcd001',
+    nullable: true,
+  })
   groupId!: string | null;
 
   @ApiProperty({ example: '모둠 3', nullable: true })

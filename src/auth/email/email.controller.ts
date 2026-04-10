@@ -1,7 +1,15 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { RolesGuard } from '../guards/roles.guard';
 import type { JwtPayload } from '../interfaces/jwt-payload.interface';
 import { SendVerificationEmailResponseDto } from './dto/send-verification-email.response.dto';
 import { VerifyEmailRequestDto } from './dto/verify-email.request.dto';
@@ -9,8 +17,9 @@ import { VerifyEmailResponseDto } from './dto/verify-email.response.dto';
 import { EmailVerificationService } from './email-verification.service';
 
 @ApiTags('auth')
+@ApiBearerAuth('access-token')
 @Controller('auth/email')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class EmailController {
   constructor(
     private readonly emailVerificationService: EmailVerificationService,

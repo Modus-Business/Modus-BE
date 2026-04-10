@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
   NotFoundException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -75,7 +76,33 @@ describe('EmailVerificationService', () => {
 
     expect(emailSenderService.sendVerificationCode).toHaveBeenCalledTimes(1);
     const sentCode = emailSenderService.sendVerificationCode.mock.calls[0][1];
-    expect(sentCode).toMatch(/^(?=(?:.*[A-Za-z]){3})(?=(?:.*\d){3})[A-Za-z\d]{6}$/);
+    expect(sentCode).toMatch(
+      /^(?=(?:.*[A-Za-z]){3})(?=(?:.*\d){3})[A-Za-z\d]{6}$/,
+    );
+  });
+
+  it('blocks resend requests during cooldown', async () => {
+    userRepository.findOne.mockResolvedValue({
+      userId: 'user-1',
+      email: 'user@example.com',
+      isEmailVerified: false,
+    } as User);
+    emailVerificationRepository.findOne.mockResolvedValue({
+      emailVerificationId: 'verification-1',
+      userId: 'user-1',
+      code: 'A1b2C3',
+      expiresAt: new Date(Date.now() + 60_000),
+      lastSentAt: new Date(),
+      failedAttemptCount: 0,
+    } as EmailVerification);
+
+    await expect(
+      emailVerificationService.sendVerificationCode({
+        sub: 'user-1',
+        email: 'user@example.com',
+        role: UserRole.STUDENT,
+      }),
+    ).rejects.toBeInstanceOf(HttpException);
   });
 
   it('verifies email when the code matches', async () => {
@@ -89,6 +116,8 @@ describe('EmailVerificationService', () => {
       userId: 'user-1',
       code: 'A1b2C3',
       expiresAt: new Date(Date.now() + 60_000),
+      lastSentAt: new Date(Date.now() - 60_000),
+      failedAttemptCount: 0,
     } as EmailVerification);
     userRepository.save.mockResolvedValue({} as never);
     emailVerificationRepository.remove.mockResolvedValue({} as never);
@@ -103,7 +132,7 @@ describe('EmailVerificationService', () => {
     );
 
     expect(result).toEqual({
-      message: '이메일 인증이 완료되었습니다.',
+      message: '이메일 인증을 완료했습니다.',
       isEmailVerified: true,
     });
   });
@@ -135,7 +164,10 @@ describe('EmailVerificationService', () => {
       userId: 'user-1',
       code: 'A1b2C3',
       expiresAt: new Date(Date.now() - 60_000),
+      lastSentAt: new Date(Date.now() - 120_000),
+      failedAttemptCount: 0,
     } as EmailVerification);
+    emailVerificationRepository.remove.mockResolvedValue({} as never);
 
     await expect(
       emailVerificationService.verifyCode(
@@ -167,5 +199,33 @@ describe('EmailVerificationService', () => {
         'A1b2C3',
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('expires verification after too many failed attempts', async () => {
+    userRepository.findOne.mockResolvedValue({
+      userId: 'user-1',
+      email: 'user@example.com',
+      isEmailVerified: false,
+    } as User);
+    emailVerificationRepository.findOne.mockResolvedValue({
+      emailVerificationId: 'verification-1',
+      userId: 'user-1',
+      code: 'A1b2C3',
+      expiresAt: new Date(Date.now() + 60_000),
+      lastSentAt: new Date(Date.now() - 120_000),
+      failedAttemptCount: 4,
+    } as EmailVerification);
+    emailVerificationRepository.remove.mockResolvedValue({} as never);
+
+    await expect(
+      emailVerificationService.verifyCode(
+        {
+          sub: 'user-1',
+          email: 'user@example.com',
+          role: UserRole.STUDENT,
+        },
+        'X9y8Z7',
+      ),
+    ).rejects.toBeInstanceOf(HttpException);
   });
 });

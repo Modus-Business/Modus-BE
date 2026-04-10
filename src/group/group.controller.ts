@@ -9,10 +9,13 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { UserRole } from '../auth/signup/enums/user-role.enum';
 import { CreateGroupRequestDto } from './dto/create-group.request.dto';
 import { CreateGroupResponseDto } from './dto/create-group.response.dto';
 import { DeleteGroupResponseDto } from './dto/delete-group.response.dto';
@@ -23,12 +26,14 @@ import { UpdateGroupRequestDto } from './dto/update-group.request.dto';
 import { GroupService } from './group.service';
 
 @ApiTags('groups')
+@ApiBearerAuth('access-token')
 @Controller('groups')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class GroupController {
   constructor(private readonly groupService: GroupService) {}
 
   @Post()
+  @Roles(UserRole.TEACHER)
   @ApiOperation({ summary: '교강사 모둠 생성' })
   async createGroup(
     @CurrentUser() currentUser: JwtPayload,
@@ -38,6 +43,7 @@ export class GroupController {
   }
 
   @Patch(':groupId')
+  @Roles(UserRole.TEACHER)
   @ApiOperation({ summary: '교강사 모둠 수정' })
   async updateGroup(
     @CurrentUser() currentUser: JwtPayload,
@@ -48,6 +54,7 @@ export class GroupController {
   }
 
   @Delete(':groupId')
+  @Roles(UserRole.TEACHER)
   @ApiOperation({ summary: '교강사 모둠 삭제' })
   async deleteGroup(
     @CurrentUser() currentUser: JwtPayload,
@@ -57,6 +64,7 @@ export class GroupController {
   }
 
   @Get('class/:classId')
+  @Roles(UserRole.TEACHER)
   @ApiOperation({ summary: '교강사 모둠 목록 조회' })
   async getGroupsByClass(
     @CurrentUser() currentUser: JwtPayload,
@@ -66,6 +74,7 @@ export class GroupController {
   }
 
   @Get('my/:classId')
+  @Roles(UserRole.STUDENT)
   @ApiOperation({ summary: '수강생 내 모둠 조회' })
   async getMyGroup(
     @CurrentUser() currentUser: JwtPayload,

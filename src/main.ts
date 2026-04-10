@@ -7,6 +7,15 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const corsOrigin = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map((value) => value.trim())
+    : true;
+
+  app.enableCors({
+    origin: corsOrigin,
+    credentials: true,
+  });
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -21,6 +30,15 @@ async function bootstrap() {
     .setTitle('Modus API')
     .setDescription('Modus backend API documentation')
     .setVersion('1.0.0')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description: '로그인 후 받은 access token을 입력하세요.',
+      },
+      'access-token',
+    )
     .build();
 
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);

@@ -9,6 +9,7 @@ import { GroupModule } from './group/group.module';
 import { MeModule } from './me/me.module';
 import { NoticeModule } from './notice/notice.module';
 import { AssignmentModule } from './assignment/assignment.module';
+import { StorageModule } from './storage/storage.module';
 import { SurveyModule } from './survey/survey.module';
 import { createTypeOrmOptions } from './database/typeorm.config';
 
@@ -25,6 +26,7 @@ import { createTypeOrmOptions } from './database/typeorm.config';
     GroupModule,
     NoticeModule,
     AssignmentModule,
+    StorageModule,
     SurveyModule,
     MeModule,
   ],

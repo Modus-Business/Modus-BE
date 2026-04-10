@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -18,6 +20,8 @@ const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 const DIGITS = '0123456789';
 const VERIFICATION_CODE_LENGTH = 6;
 const VERIFICATION_EXPIRATION_MINUTES = 10;
+const RESEND_COOLDOWN_SECONDS = 60;
+const MAX_FAILED_ATTEMPTS = 5;
 
 @Injectable()
 export class EmailVerificationService {
@@ -46,11 +50,11 @@ export class EmailVerificationService {
       throw new ConflictException('이미 이메일 인증이 완료된 계정입니다.');
     }
 
+    const now = new Date();
     const code = this.generateVerificationCode();
     const expiresAt = new Date(
-      Date.now() + VERIFICATION_EXPIRATION_MINUTES * 60 * 1000,
+      now.getTime() + VERIFICATION_EXPIRATION_MINUTES * 60 * 1000,
     );
-
     const existingVerification =
       await this.emailVerificationRepository.findOne({
         where: {
@@ -58,15 +62,30 @@ export class EmailVerificationService {
         },
       });
 
+    if (
+      existingVerification?.lastSentAt &&
+      existingVerification.lastSentAt.getTime() + RESEND_COOLDOWN_SECONDS * 1000 >
+        now.getTime()
+    ) {
+      throw new HttpException(
+        `${RESEND_COOLDOWN_SECONDS}초 뒤에 인증 코드를 다시 요청해 주세요.`,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
     if (existingVerification) {
       existingVerification.code = code;
       existingVerification.expiresAt = expiresAt;
+      existingVerification.lastSentAt = now;
+      existingVerification.failedAttemptCount = 0;
       await this.emailVerificationRepository.save(existingVerification);
     } else {
       const emailVerification = this.emailVerificationRepository.create({
         userId: user.userId,
         code,
         expiresAt,
+        lastSentAt: now,
+        failedAttemptCount: 0,
       });
 
       await this.emailVerificationRepository.save(emailVerification);
@@ -112,10 +131,22 @@ export class EmailVerificationService {
     }
 
     if (emailVerification.expiresAt.getTime() < Date.now()) {
+      await this.emailVerificationRepository.remove(emailVerification);
       throw new BadRequestException('인증 코드가 만료되었습니다.');
     }
 
     if (emailVerification.code !== code) {
+      emailVerification.failedAttemptCount += 1;
+
+      if (emailVerification.failedAttemptCount >= MAX_FAILED_ATTEMPTS) {
+        await this.emailVerificationRepository.remove(emailVerification);
+        throw new HttpException(
+          '인증 시도 횟수를 초과했습니다. 새 코드를 요청해 주세요.',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+
+      await this.emailVerificationRepository.save(emailVerification);
       throw new BadRequestException('인증 코드가 올바르지 않습니다.');
     }
 
@@ -124,7 +155,7 @@ export class EmailVerificationService {
     await this.emailVerificationRepository.remove(emailVerification);
 
     return {
-      message: '이메일 인증이 완료되었습니다.',
+      message: '이메일 인증을 완료했습니다.',
       isEmailVerified: true,
     };
   }

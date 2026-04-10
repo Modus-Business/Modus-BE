@@ -1,5 +1,5 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
@@ -7,6 +7,7 @@ import { MeSettingsResponseDto } from './dto/me-settings.response.dto';
 import { MeService } from './me.service';
 
 @ApiTags('me')
+@ApiBearerAuth('access-token')
 @Controller('me')
 @UseGuards(JwtAuthGuard)
 export class MeController {
