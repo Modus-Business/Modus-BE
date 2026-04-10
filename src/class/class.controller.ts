@@ -11,9 +11,11 @@ import {
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
+  ApiExtraModels,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  getSchemaPath,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -30,6 +32,7 @@ import { JoinClassResponseDto } from './dto/join-class.response.dto';
 import { RegenerateClassCodeResponseDto } from './dto/regenerate-class-code.response.dto';
 
 @ApiTags('classes')
+@ApiExtraModels(ClassesResponseDto)
 @ApiBearerAuth('access-token')
 @Controller('classes')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -40,7 +43,20 @@ export class ClassController {
   @ApiOperation({ summary: '메인 화면 수업 목록 조회' })
   @ApiOkResponse({
     description: '학생 또는 교강사의 메인 화면 수업 목록을 반환합니다.',
-    type: ClassesResponseDto,
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        statusCode: { type: 'number', example: 200 },
+        data: { $ref: getSchemaPath(ClassesResponseDto) },
+        timestamp: {
+          type: 'string',
+          format: 'date-time',
+          example: '2026-04-11T12:00:00.000Z',
+        },
+        path: { type: 'string', example: '/classes' },
+      },
+    },
   })
   async getClasses(
     @CurrentUser() currentUser: JwtPayload,
