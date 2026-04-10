@@ -115,6 +115,7 @@ function createUser(): User {
     name: '홍길동',
     email: 'user@example.com',
     passwordHash: 'hashed-password',
+    isEmailVerified: false,
     role: UserRole.STUDENT,
     createdAt: new Date(),
     updatedAt: new Date(),

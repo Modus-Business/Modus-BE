@@ -117,6 +117,32 @@ describe('TokenService', () => {
     });
   });
 
+  it('access token 검증 시 access secret을 사용한다', () => {
+    configService.get.mockImplementation((key: string, defaultValue?: string) => {
+      if (key === 'JWT_SECRET') {
+        return 'access-secret';
+      }
+
+      return defaultValue;
+    });
+    jwtService.verify.mockReturnValue({
+      sub: 'user-1',
+      email: 'user@example.com',
+      role: UserRole.STUDENT,
+    });
+
+    const result = tokenService.verifyAccessToken('access-token');
+
+    expect(result).toEqual({
+      sub: 'user-1',
+      email: 'user@example.com',
+      role: UserRole.STUDENT,
+    });
+    expect(jwtService.verify).toHaveBeenCalledWith('access-token', {
+      secret: 'access-secret',
+    });
+  });
+
   it('refresh token 검증이 실패하면 UnauthorizedException을 던진다', () => {
     configService.get.mockImplementation((key: string, defaultValue?: string) => {
       if (key === 'JWT_REFRESH_SECRET') {
@@ -151,6 +177,7 @@ function createUser(): User {
     name: '홍길동',
     email: 'user@example.com',
     passwordHash: 'hashed-password',
+    isEmailVerified: false,
     role: UserRole.STUDENT,
     createdAt: new Date(),
     updatedAt: new Date(),

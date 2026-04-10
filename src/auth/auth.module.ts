@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { LoginController } from './login/login.controller';
 import { LoginService } from './login/login.service';
 import { RefreshToken } from './login/refresh-token/entities/refresh-token.entity';
@@ -35,6 +36,7 @@ import { User } from './signup/entities/user.entity';
   ],
   controllers: [LoginController, LogoutController, SignupController],
   providers: [
+    JwtAuthGuard,
     LoginService,
     SignupService,
     PasswordService,
@@ -43,5 +45,6 @@ import { User } from './signup/entities/user.entity';
     RefreshService,
     LogoutService,
   ],
+  exports: [JwtAuthGuard, TokenService],
 })
 export class AuthModule {}

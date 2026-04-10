@@ -59,6 +59,18 @@ export class TokenService {
     }
   }
 
+  verifyAccessToken(accessToken: string): JwtPayload {
+    try {
+      return this.jwtService.verify<JwtPayload>(accessToken, {
+        secret: this.getRequiredConfig('JWT_SECRET'),
+      });
+    } catch {
+      throw new UnauthorizedException(
+        '액세스 토큰이 올바르지 않거나 만료되었습니다.',
+      );
+    }
+  }
+
   getRefreshTokenExpiresAt(refreshToken: string): Date {
     const decodedToken = this.jwtService.decode(refreshToken);
 

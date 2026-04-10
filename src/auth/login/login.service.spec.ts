@@ -3,10 +3,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { hash } from 'bcryptjs';
 import { Repository } from 'typeorm';
-import { RefreshTokenService } from './refresh-token/refresh-token.service';
-import { TokenService } from './token/token.service';
 import { UserRole } from '../signup/enums/user-role.enum';
 import { User } from '../signup/entities/user.entity';
+import { RefreshTokenService } from './refresh-token/refresh-token.service';
+import { TokenService } from './token/token.service';
 import { LoginService } from './login.service';
 
 describe('LoginService', () => {
@@ -116,6 +116,7 @@ function createUser(passwordHash = 'hashed-password'): User {
     name: '홍길동',
     email: 'user@example.com',
     passwordHash,
+    isEmailVerified: false,
     role: UserRole.STUDENT,
     createdAt: new Date(),
     updatedAt: new Date(),
