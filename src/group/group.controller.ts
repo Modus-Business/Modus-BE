@@ -9,7 +9,13 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiExtraModels,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -19,6 +25,12 @@ import { UserRole } from '../auth/signup/enums/user-role.enum';
 import { CreateGroupRequestDto } from './dto/create-group.request.dto';
 import { CreateGroupResponseDto } from './dto/create-group.response.dto';
 import { DeleteGroupResponseDto } from './dto/delete-group.response.dto';
+import {
+  GetGroupDetailSuccessResponseDto,
+  GetGroupsByClassSuccessResponseDto,
+  GetMyGroupSuccessResponseDto,
+  GroupGetExtraModels,
+} from './dto/group-get.response.dto';
 import { GroupDetailResponseDto } from './dto/group-detail.response.dto';
 import { GroupListResponseDto } from './dto/group-list.response.dto';
 import { MyGroupResponseDto } from './dto/my-group.response.dto';
@@ -26,6 +38,7 @@ import { UpdateGroupRequestDto } from './dto/update-group.request.dto';
 import { GroupService } from './group.service';
 
 @ApiTags('groups')
+@ApiExtraModels(...GroupGetExtraModels)
 @ApiBearerAuth('access-token')
 @Controller('groups')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -34,7 +47,7 @@ export class GroupController {
 
   @Post()
   @Roles(UserRole.TEACHER)
-  @ApiOperation({ summary: '교강사 모둠 생성' })
+  @ApiOperation({ summary: '교사용 모둠 생성' })
   async createGroup(
     @CurrentUser() currentUser: JwtPayload,
     @Body() request: CreateGroupRequestDto,
@@ -44,7 +57,7 @@ export class GroupController {
 
   @Patch(':groupId')
   @Roles(UserRole.TEACHER)
-  @ApiOperation({ summary: '교강사 모둠 수정' })
+  @ApiOperation({ summary: '교사용 모둠 수정' })
   async updateGroup(
     @CurrentUser() currentUser: JwtPayload,
     @Param('groupId', new ParseUUIDPipe()) groupId: string,
@@ -55,7 +68,7 @@ export class GroupController {
 
   @Delete(':groupId')
   @Roles(UserRole.TEACHER)
-  @ApiOperation({ summary: '교강사 모둠 삭제' })
+  @ApiOperation({ summary: '교사용 모둠 삭제' })
   async deleteGroup(
     @CurrentUser() currentUser: JwtPayload,
     @Param('groupId', new ParseUUIDPipe()) groupId: string,
@@ -65,7 +78,11 @@ export class GroupController {
 
   @Get('class/:classId')
   @Roles(UserRole.TEACHER)
-  @ApiOperation({ summary: '교강사 모둠 목록 조회' })
+  @ApiOperation({ summary: '교사용 모둠 목록 조회' })
+  @ApiOkResponse({
+    description: '특정 수업의 모둠 목록을 반환합니다.',
+    type: GetGroupsByClassSuccessResponseDto,
+  })
   async getGroupsByClass(
     @CurrentUser() currentUser: JwtPayload,
     @Param('classId', new ParseUUIDPipe()) classId: string,
@@ -75,7 +92,11 @@ export class GroupController {
 
   @Get('my/:classId')
   @Roles(UserRole.STUDENT)
-  @ApiOperation({ summary: '수강생 내 모둠 조회' })
+  @ApiOperation({ summary: '학생용 내 모둠 조회' })
+  @ApiOkResponse({
+    description: '특정 수업에서 내 모둠 정보를 반환합니다.',
+    type: GetMyGroupSuccessResponseDto,
+  })
   async getMyGroup(
     @CurrentUser() currentUser: JwtPayload,
     @Param('classId', new ParseUUIDPipe()) classId: string,
@@ -85,6 +106,10 @@ export class GroupController {
 
   @Get(':groupId')
   @ApiOperation({ summary: '모둠 상세 조회' })
+  @ApiOkResponse({
+    description: '모둠 상세 정보와 멤버 목록을 반환합니다.',
+    type: GetGroupDetailSuccessResponseDto,
+  })
   async getGroupDetail(
     @CurrentUser() currentUser: JwtPayload,
     @Param('groupId', new ParseUUIDPipe()) groupId: string,
