@@ -28,7 +28,7 @@ export class MeController {
     description: '설정 화면에 필요한 사용자 정보를 반환합니다.',
     type: GetMeSettingsSuccessResponseDto,
   })
-  @ApiErrorResponses([401, 500])
+  @ApiErrorResponses([401, 404, 500])
   async getSettings(
     @CurrentUser() currentUser: JwtPayload,
   ): Promise<MeSettingsResponseDto> {

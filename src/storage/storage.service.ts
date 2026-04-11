@@ -6,8 +6,8 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { extname } from 'node:path';
 import { randomInt } from 'node:crypto';
+import { extname } from 'node:path';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { CreatePresignedUploadUrlRequestDto } from './dto/create-presigned-upload-url.request.dto';
 import { CreatePresignedUploadUrlResponseDto } from './dto/create-presigned-upload-url.response.dto';

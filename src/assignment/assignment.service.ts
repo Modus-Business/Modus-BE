@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
@@ -26,6 +27,7 @@ export class AssignmentService {
     private readonly groupRepository: Repository<Group>,
     @InjectRepository(Classroom)
     private readonly classroomRepository: Repository<Classroom>,
+    private readonly configService: ConfigService,
   ) {}
 
   async submitAssignment(
@@ -40,6 +42,10 @@ export class AssignmentService {
       throw new BadRequestException(
         'fileUrl 또는 link 중 하나는 반드시 제출해야 합니다.',
       );
+    }
+
+    if (request.fileUrl) {
+      this.validateAssignmentFileUrl(request.fileUrl);
     }
 
     const group = await this.getStudentAccessibleGroup(currentUser, request.groupId);
@@ -95,7 +101,7 @@ export class AssignmentService {
   ): Promise<AssignmentSubmissionStatusListResponseDto> {
     if (currentUser.role !== UserRole.TEACHER) {
       throw new ForbiddenException(
-        '교강사만 수업별 제출 현황을 조회할 수 있습니다.',
+        '교사만 수업별 제출 현황을 조회할 수 있습니다.',
       );
     }
 
@@ -149,6 +155,54 @@ export class AssignmentService {
         };
       }),
     };
+  }
+
+  private validateAssignmentFileUrl(fileUrl: string): void {
+    const allowedPrefixes = this.getAllowedAssignmentFileUrlPrefixes();
+    const normalizedFileUrl = fileUrl.trim();
+
+    if (
+      allowedPrefixes.length > 0 &&
+      !allowedPrefixes.some((prefix) => normalizedFileUrl.startsWith(prefix))
+    ) {
+      throw new BadRequestException(
+        'fileUrl은 스토리지 업로드 API가 발급한 assignments 경로만 사용할 수 있습니다.',
+      );
+    }
+
+    const pathname = this.extractPathname(normalizedFileUrl);
+
+    if (!pathname.startsWith('/assignments/')) {
+      throw new BadRequestException(
+        'fileUrl은 assignments 경로의 업로드 파일이어야 합니다.',
+      );
+    }
+  }
+
+  private getAllowedAssignmentFileUrlPrefixes(): string[] {
+    const publicBaseUrl =
+      this.configService.get<string>('AWS_S3_PUBLIC_BASE_URL')?.trim() ?? '';
+    const bucket = this.configService.get<string>('AWS_S3_BUCKET')?.trim() ?? '';
+    const region = this.configService.get<string>('AWS_REGION')?.trim() ?? '';
+    const prefixes = new Set<string>();
+
+    if (publicBaseUrl) {
+      prefixes.add(publicBaseUrl.replace(/\/$/, '') + '/');
+    }
+
+    if (bucket && region) {
+      prefixes.add(`https://${bucket}.s3.${region}.amazonaws.com/`);
+    }
+
+    return Array.from(prefixes);
+  }
+
+  private extractPathname(fileUrl: string): string {
+    try {
+      return new URL(fileUrl).pathname;
+    } catch {
+      throw new BadRequestException('fileUrl 형식이 올바르지 않습니다.');
+    }
   }
 
   private async getStudentAccessibleGroup(
