@@ -8,21 +8,21 @@ import {
   PrimaryGeneratedColumn,
   Unique,
 } from 'typeorm';
-import { Group } from './group.entity';
-import { GroupMember } from './group-member.entity';
+import { ClassParticipant } from '../../class/entities/class-participant.entity';
+import { Classroom } from '../../class/entities/class.entity';
 
 @Entity({ name: 'group_nicknames' })
-@Unique('uq_group_nicknames_group_member_id', ['groupMemberId'])
-@Unique('uq_group_nicknames_group_id_nickname', ['groupId', 'nickname'])
+@Unique('uq_group_nicknames_class_participant_id', ['classParticipantId'])
+@Unique('uq_group_nicknames_class_id_nickname', ['classId', 'nickname'])
 export class GroupNickname {
   @PrimaryGeneratedColumn('uuid')
   groupNicknameId!: string;
 
-  @Column({ type: 'uuid', name: 'group_id' })
-  groupId!: string;
+  @Column({ type: 'uuid', name: 'class_id' })
+  classId!: string;
 
-  @Column({ type: 'uuid', name: 'group_member_id' })
-  groupMemberId!: string;
+  @Column({ type: 'uuid', name: 'class_participant_id' })
+  classParticipantId!: string;
 
   @Column({ type: 'varchar', length: 100 })
   nickname!: string;
@@ -30,15 +30,17 @@ export class GroupNickname {
   @CreateDateColumn()
   createdAt!: Date;
 
-  @ManyToOne(() => Group, (group) => group.groupNicknames, {
-    onDelete: 'CASCADE',
-  })
-  @JoinColumn({ name: 'group_id' })
-  group!: Group;
+  @ManyToOne(() => Classroom, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'class_id' })
+  classroom!: Classroom;
 
-  @OneToOne(() => GroupMember, (groupMember) => groupMember.groupNickname, {
-    onDelete: 'CASCADE',
-  })
-  @JoinColumn({ name: 'group_member_id' })
-  groupMember!: GroupMember;
+  @OneToOne(
+    () => ClassParticipant,
+    (classParticipant) => classParticipant.groupNickname,
+    {
+      onDelete: 'CASCADE',
+    },
+  )
+  @JoinColumn({ name: 'class_participant_id' })
+  classParticipant!: ClassParticipant;
 }

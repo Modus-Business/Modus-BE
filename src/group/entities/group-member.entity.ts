@@ -10,7 +10,6 @@ import {
 } from 'typeorm';
 import { ClassParticipant } from '../../class/entities/class-participant.entity';
 import { Group } from './group.entity';
-import { GroupNickname } from './group-nickname.entity';
 
 @Entity({ name: 'group_members' })
 @Unique('uq_group_members_class_participant_id', ['classParticipantId'])
@@ -42,7 +41,4 @@ export class GroupMember {
   )
   @JoinColumn({ name: 'class_participant_id' })
   classParticipant!: ClassParticipant;
-
-  @OneToOne(() => GroupNickname, (groupNickname) => groupNickname.groupMember)
-  groupNickname!: GroupNickname | null;
 }

@@ -9,6 +9,7 @@ import {
   Unique,
 } from 'typeorm';
 import { GroupMember } from '../../group/entities/group-member.entity';
+import { GroupNickname } from '../../group/entities/group-nickname.entity';
 import { User } from '../../auth/signup/entities/user.entity';
 import { Classroom } from './class.entity';
 
@@ -39,4 +40,10 @@ export class ClassParticipant {
 
   @OneToOne(() => GroupMember, (groupMember) => groupMember.classParticipant)
   groupMember!: GroupMember | null;
+
+  @OneToOne(
+    () => GroupNickname,
+    (groupNickname) => groupNickname.classParticipant,
+  )
+  groupNickname?: GroupNickname | null;
 }

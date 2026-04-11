@@ -23,12 +23,12 @@ import { GroupNickname } from './entities/group-nickname.entity';
 import { Group } from './entities/group.entity';
 
 const GROUP_NICKNAME_ADJECTIVES = [
-  '빠른',
+  '푸른',
   '조용한',
   '반짝이는',
-  '단단한',
-  '부드러운',
   '담대한',
+  '부드러운',
+  '느린',
   '기민한',
   '영리한',
   '차분한',
@@ -37,15 +37,15 @@ const GROUP_NICKNAME_ADJECTIVES = [
 
 const GROUP_NICKNAME_NOUNS = [
   '파도',
-  '별빛',
-  '산호',
-  '새벽',
+  '나침반',
+  '호수',
+  '안개',
   '유성',
   '메아리',
   '고래',
   '구름',
-  '호수',
-  '은하',
+  '온도',
+  '달빛',
 ];
 
 @Injectable()
@@ -68,7 +68,7 @@ export class GroupService {
     request: CreateGroupRequestDto,
   ): Promise<CreateGroupResponseDto> {
     if (currentUser.role !== UserRole.TEACHER) {
-      throw new ForbiddenException('교강사만 모둠을 생성할 수 있습니다.');
+      throw new ForbiddenException('교사만 모둠을 생성할 수 있습니다.');
     }
 
     const classroom = await this.classroomRepository.findOne({
@@ -82,9 +82,7 @@ export class GroupService {
     }
 
     if (classroom.teacherId !== currentUser.sub) {
-      throw new ForbiddenException(
-        '본인이 만든 수업의 모둠만 생성할 수 있습니다.',
-      );
+      throw new ForbiddenException('본인 수업의 모둠만 생성할 수 있습니다.');
     }
 
     const studentIds = request.studentIds ?? [];
@@ -103,7 +101,11 @@ export class GroupService {
     const savedGroup = await this.groupRepository.save(group);
 
     if (participants.length > 0) {
-      await this.addParticipantsToGroup(savedGroup.groupId, participants, new Set());
+      await this.addParticipantsToGroup(
+        savedGroup.groupId,
+        request.classId,
+        participants,
+      );
     }
 
     return {
@@ -130,9 +132,6 @@ export class GroupService {
     const currentMembers = await this.groupMemberRepository.find({
       where: {
         groupId,
-      },
-      relations: {
-        groupNickname: true,
       },
       order: {
         joinedAt: 'ASC',
@@ -163,21 +162,12 @@ export class GroupService {
       await this.groupMemberRepository.remove(membersToRemove);
     }
 
-    const usedNicknames = new Set(
-      currentMembers
-        .filter((groupMember) =>
-          requestedParticipantIdSet.has(groupMember.classParticipantId),
-        )
-        .map((groupMember) => groupMember.groupNickname?.nickname)
-        .filter((nickname): nickname is string => Boolean(nickname)),
-    );
-
     const participantsToAdd = participants.filter((classParticipant) =>
       participantIdsToAdd.includes(classParticipant.classParticipantId),
     );
 
     if (participantsToAdd.length > 0) {
-      await this.addParticipantsToGroup(groupId, participantsToAdd, usedNicknames);
+      await this.addParticipantsToGroup(groupId, group.classId, participantsToAdd);
     }
 
     group.name = request.name.trim();
@@ -216,7 +206,7 @@ export class GroupService {
     classId: string,
   ): Promise<GroupListResponseDto> {
     if (currentUser.role !== UserRole.TEACHER) {
-      throw new ForbiddenException('교강사만 모둠 목록을 조회할 수 있습니다.');
+      throw new ForbiddenException('교사만 모둠 목록을 조회할 수 있습니다.');
     }
 
     const classroom = await this.classroomRepository.findOne({
@@ -230,9 +220,7 @@ export class GroupService {
     }
 
     if (classroom.teacherId !== currentUser.sub) {
-      throw new ForbiddenException(
-        '본인이 만든 수업의 모둠만 조회할 수 있습니다.',
-      );
+      throw new ForbiddenException('본인 수업의 모둠만 조회할 수 있습니다.');
     }
 
     const groups = await this.groupRepository.find({
@@ -248,12 +236,12 @@ export class GroupService {
     });
 
     return {
-      groups: groups.map((group) => ({
-        groupId: group.groupId,
-        classId: group.classId,
-        name: group.name,
-        memberCount: group.groupMembers.length,
-        createdAt: group.createdAt,
+      groups: groups.map((savedGroup) => ({
+        groupId: savedGroup.groupId,
+        classId: savedGroup.classId,
+        name: savedGroup.name,
+        memberCount: savedGroup.groupMembers.length,
+        createdAt: savedGroup.createdAt,
       })),
     };
   }
@@ -263,7 +251,7 @@ export class GroupService {
     classId: string,
   ): Promise<MyGroupResponseDto> {
     if (currentUser.role !== UserRole.STUDENT) {
-      throw new ForbiddenException('수강생만 내 모둠을 조회할 수 있습니다.');
+      throw new ForbiddenException('학생만 내 모둠을 조회할 수 있습니다.');
     }
 
     const classParticipant = await this.classParticipantRepository.findOne({
@@ -317,8 +305,8 @@ export class GroupService {
         groupMembers: {
           classParticipant: {
             student: true,
+            groupNickname: true,
           },
-          groupNickname: true,
         },
       },
       order: {
@@ -334,9 +322,7 @@ export class GroupService {
 
     if (currentUser.role === UserRole.TEACHER) {
       if (group.classroom.teacherId !== currentUser.sub) {
-        throw new ForbiddenException(
-          '본인이 만든 수업의 모둠만 상세 조회할 수 있습니다.',
-        );
+        throw new ForbiddenException('본인 수업의 모둠만 상세 조회할 수 있습니다.');
       }
 
       return {
@@ -359,9 +345,7 @@ export class GroupService {
       );
 
       if (!isMember) {
-        throw new ForbiddenException(
-          '본인이 속한 모둠만 상세 조회할 수 있습니다.',
-        );
+        throw new ForbiddenException('본인이 속한 모둠만 상세 조회할 수 있습니다.');
       }
 
       return {
@@ -372,7 +356,8 @@ export class GroupService {
         members: group.groupMembers.map((groupMember) => ({
           groupMemberId: groupMember.groupMemberId,
           displayName:
-            groupMember.groupNickname?.nickname ?? '이름 없는 모둠원',
+            groupMember.classParticipant.groupNickname?.nickname ??
+            '이름 없는 모둠원',
           isMe: groupMember.classParticipant.studentId === currentUser.sub,
         })),
       };
@@ -383,8 +368,8 @@ export class GroupService {
 
   private async addParticipantsToGroup(
     groupId: string,
+    classId: string,
     participants: ClassParticipant[],
-    usedNicknames: Set<string>,
   ): Promise<void> {
     const groupMembers = participants.map((classParticipant) =>
       this.groupMemberRepository.create({
@@ -392,16 +377,48 @@ export class GroupService {
         classParticipantId: classParticipant.classParticipantId,
       }),
     );
-    const savedGroupMembers = await this.groupMemberRepository.save(groupMembers);
-    const groupNicknames = savedGroupMembers.map((groupMember) =>
-      this.groupNicknameRepository.create({
-        groupId,
-        groupMemberId: groupMember.groupMemberId,
-        nickname: this.generateUniqueNickname(usedNicknames),
-      }),
-    );
+    await this.groupMemberRepository.save(groupMembers);
+    await this.ensureClassScopedNicknames(classId, participants);
+  }
 
-    await this.groupNicknameRepository.save(groupNicknames);
+  private async ensureClassScopedNicknames(
+    classId: string,
+    participants: ClassParticipant[],
+  ): Promise<void> {
+    if (participants.length === 0) {
+      return;
+    }
+
+    const existingNicknames = await this.groupNicknameRepository.find({
+      where: {
+        classId,
+      },
+    });
+    const existingNicknameMap = new Map(
+      existingNicknames.map((groupNickname) => [
+        groupNickname.classParticipantId,
+        groupNickname.nickname,
+      ]),
+    );
+    const usedNicknames = new Set(
+      existingNicknames.map((groupNickname) => groupNickname.nickname),
+    );
+    const nicknamesToCreate = participants
+      .filter(
+        (classParticipant) =>
+          !existingNicknameMap.has(classParticipant.classParticipantId),
+      )
+      .map((classParticipant) =>
+        this.groupNicknameRepository.create({
+          classId,
+          classParticipantId: classParticipant.classParticipantId,
+          nickname: this.generateUniqueNickname(usedNicknames),
+        }),
+      );
+
+    if (nicknamesToCreate.length > 0) {
+      await this.groupNicknameRepository.save(nicknamesToCreate);
+    }
   }
 
   private generateUniqueNickname(usedNicknames: Set<string>): string {
@@ -439,7 +456,7 @@ export class GroupService {
     groupId: string,
   ): Promise<Group> {
     if (currentUser.role !== UserRole.TEACHER) {
-      throw new ForbiddenException('교강사만 모둠을 관리할 수 있습니다.');
+      throw new ForbiddenException('교사만 모둠을 관리할 수 있습니다.');
     }
 
     const group = await this.groupRepository.findOne({
@@ -456,9 +473,7 @@ export class GroupService {
     }
 
     if (group.classroom.teacherId !== currentUser.sub) {
-      throw new ForbiddenException(
-        '본인이 만든 수업의 모둠만 관리할 수 있습니다.',
-      );
+      throw new ForbiddenException('본인 수업의 모둠만 관리할 수 있습니다.');
     }
 
     return group;

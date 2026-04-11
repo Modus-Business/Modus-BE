@@ -65,6 +65,7 @@ describe('GroupService', () => {
           useValue: {
             create: jest.fn(),
             save: jest.fn(),
+            find: jest.fn(),
           },
         },
       ],
@@ -78,7 +79,7 @@ describe('GroupService', () => {
     groupNicknameRepository = module.get(getRepositoryToken(GroupNickname));
   });
 
-  it('teacher can create a group and issue nicknames for members', async () => {
+  it('teacher can create a group and issue class-scoped nicknames for members', async () => {
     const request: CreateGroupRequestDto = {
       classId: 'class-1',
       name: '모둠 3',
@@ -103,6 +104,7 @@ describe('GroupService', () => {
       },
     ] as ClassParticipant[]);
     groupMemberRepository.find.mockResolvedValue([]);
+    groupNicknameRepository.find.mockResolvedValue([]);
     groupRepository.create.mockImplementation((input) => input as Group);
     groupRepository.save.mockResolvedValue({
       groupId: 'group-1',
@@ -148,13 +150,9 @@ describe('GroupService', () => {
       createdAt,
     });
     expect(groupNicknameRepository.create).toHaveBeenCalledTimes(2);
-
-    const createdNicknames = groupNicknameRepository.create.mock.calls.map(
-      ([input]) => input.nickname,
+    expect(groupNicknameRepository.create.mock.calls[0][0].classId).toBe(
+      'class-1',
     );
-    expect(createdNicknames[0]).toBeDefined();
-    expect(createdNicknames[1]).toBeDefined();
-    expect(createdNicknames[0]).not.toBe(createdNicknames[1]);
   });
 
   it('throws conflict when a student is already assigned to another group', async () => {
@@ -277,6 +275,8 @@ describe('GroupService', () => {
       groupId: 'group-1',
       classId: 'class-1',
       name: '모둠 3',
+      createdAt: new Date(),
+      updatedAt: new Date(),
       classroom: {
         classId: 'class-1',
         teacherId: 'teacher-1',
@@ -287,13 +287,13 @@ describe('GroupService', () => {
           classParticipant: {
             studentId: 'student-2',
             student: { name: '다른 학생' },
-          },
-          groupNickname: {
-            nickname: '푸른 나침반',
+            groupNickname: {
+              nickname: '푸른 나침반',
+            },
           },
         },
       ],
-    } as Group);
+    } as unknown as Group);
 
     await expect(
       groupService.getGroupDetail(
@@ -307,11 +307,13 @@ describe('GroupService', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('returns saved nicknames to student members', async () => {
+  it('returns class-scoped nicknames to student members', async () => {
     groupRepository.findOne.mockResolvedValue({
       groupId: 'group-1',
       classId: 'class-1',
       name: '모둠 3',
+      createdAt: new Date(),
+      updatedAt: new Date(),
       classroom: {
         classId: 'class-1',
         teacherId: 'teacher-1',
@@ -322,9 +324,9 @@ describe('GroupService', () => {
           classParticipant: {
             studentId: 'student-1',
             student: { name: '최민수' },
-          },
-          groupNickname: {
-            nickname: '푸른 나침반',
+            groupNickname: {
+              nickname: '푸른 나침반',
+            },
           },
         },
         {
@@ -332,13 +334,13 @@ describe('GroupService', () => {
           classParticipant: {
             studentId: 'student-2',
             student: { name: '김하늘' },
-          },
-          groupNickname: {
-            nickname: '반짝이는 파도',
+            groupNickname: {
+              nickname: '반짝이는 파도',
+            },
           },
         },
       ],
-    } as Group);
+    } as unknown as Group);
 
     const result = await groupService.getGroupDetail(
       {
@@ -374,6 +376,8 @@ describe('GroupService', () => {
       groupId: 'group-1',
       classId: 'class-1',
       name: '모둠 3',
+      createdAt: new Date(),
+      updatedAt: new Date(),
       classroom: {
         classId: 'class-1',
         teacherId: 'teacher-1',
@@ -384,13 +388,13 @@ describe('GroupService', () => {
           classParticipant: {
             studentId: 'student-1',
             student: { name: '최민수' },
-          },
-          groupNickname: {
-            nickname: '푸른 나침반',
+            groupNickname: {
+              nickname: '푸른 나침반',
+            },
           },
         },
       ],
-    } as Group);
+    } as unknown as Group);
 
     const result = await groupService.getGroupDetail(
       {
@@ -416,12 +420,13 @@ describe('GroupService', () => {
     });
   });
 
-  it('removes nicknames for removed members and issues new nicknames for added members on update', async () => {
+  it('reuses existing class nickname when member moves within same class', async () => {
     groupRepository.findOne.mockResolvedValue({
       groupId: 'group-1',
       classId: 'class-1',
       name: '모둠 3',
       createdAt: new Date('2026-04-10T12:00:00.000Z'),
+      updatedAt: new Date('2026-04-10T12:00:00.000Z'),
       classroom: {
         classId: 'class-1',
         teacherId: 'teacher-1',
@@ -445,17 +450,11 @@ describe('GroupService', () => {
           groupMemberId: 'group-member-1',
           groupId: 'group-1',
           classParticipantId: 'participant-1',
-          groupNickname: {
-            nickname: '푸른 나침반',
-          },
         },
         {
           groupMemberId: 'group-member-2',
           groupId: 'group-1',
           classParticipantId: 'participant-2',
-          groupNickname: {
-            nickname: '반짝이는 파도',
-          },
         },
       ] as GroupMember[])
       .mockResolvedValueOnce([]);
@@ -470,6 +469,18 @@ describe('GroupService', () => {
         classParticipantId: 'participant-3',
       },
     ] as unknown as never);
+    groupNicknameRepository.find.mockResolvedValue([
+      {
+        classId: 'class-1',
+        classParticipantId: 'participant-1',
+        nickname: '푸른 나침반',
+      },
+      {
+        classId: 'class-1',
+        classParticipantId: 'participant-2',
+        nickname: '반짝이는 파도',
+      },
+    ] as GroupNickname[]);
     groupNicknameRepository.create.mockImplementation(
       (input) => input as GroupNickname,
     );
@@ -492,9 +503,9 @@ describe('GroupService', () => {
 
     expect(groupMemberRepository.remove).toHaveBeenCalledTimes(1);
     expect(groupNicknameRepository.create).toHaveBeenCalledTimes(1);
-    expect(
-      groupNicknameRepository.create.mock.calls[0][0].nickname,
-    ).not.toBe('푸른 나침반');
+    expect(groupNicknameRepository.create.mock.calls[0][0].classId).toBe(
+      'class-1',
+    );
     expect(result).toEqual({
       groupId: 'group-1',
       classId: 'class-1',
@@ -527,7 +538,7 @@ describe('GroupService', () => {
     );
 
     expect(result).toEqual({
-      message: '모둠이 삭제되었습니다.',
+      message: '모둠을 삭제했습니다.',
     });
   });
 
