@@ -3,6 +3,7 @@ import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { DataSourceOptions } from 'typeorm';
 import { EmailVerification } from '../auth/email/entities/email-verification.entity';
 import { RefreshToken } from '../auth/login/refresh-token/entities/refresh-token.entity';
+import { SignupVerification } from '../auth/signup/entities/signup-verification.entity';
 import { User } from '../auth/signup/entities/user.entity';
 import { AssignmentSubmission } from '../assignment/entities/assignment-submission.entity';
 import { ClassParticipant } from '../class/entities/class-participant.entity';
@@ -16,6 +17,7 @@ import { Survey } from '../survey/entities/survey.entity';
 const databaseEntities = [
   User,
   EmailVerification,
+  SignupVerification,
   RefreshToken,
   Classroom,
   ClassParticipant,
@@ -27,7 +29,10 @@ const databaseEntities = [
   Survey,
 ];
 
-const parseBoolean = (value: string | undefined, defaultValue: boolean): boolean => {
+const parseBoolean = (
+  value: string | undefined,
+  defaultValue: boolean,
+): boolean => {
   if (value === undefined) {
     return defaultValue;
   }

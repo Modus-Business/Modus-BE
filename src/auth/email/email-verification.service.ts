@@ -46,6 +46,15 @@ export class EmailVerificationService {
       throw new NotFoundException('사용자 정보를 찾을 수 없습니다.');
     }
 
+    const expiresAt = await this.issueVerificationCodeForUser(user);
+
+    return {
+      message: '인증 코드가 이메일로 발송되었습니다.',
+      expiresAt,
+    };
+  }
+
+  async issueVerificationCodeForUser(user: User): Promise<Date> {
     if (user.isEmailVerified) {
       throw new ConflictException('이미 이메일 인증이 완료된 계정입니다.');
     }
@@ -68,7 +77,7 @@ export class EmailVerificationService {
         now.getTime()
     ) {
       throw new HttpException(
-        `${RESEND_COOLDOWN_SECONDS}초 뒤에 인증 코드를 다시 요청해 주세요.`,
+        `${RESEND_COOLDOWN_SECONDS}초 후에 인증 코드를 다시 요청해 주세요.`,
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
@@ -93,10 +102,7 @@ export class EmailVerificationService {
 
     await this.emailSenderService.sendVerificationCode(user.email, code);
 
-    return {
-      message: '인증 코드가 이메일로 발송되었습니다.',
-      expiresAt,
-    };
+    return expiresAt;
   }
 
   async verifyCode(
@@ -155,7 +161,7 @@ export class EmailVerificationService {
     await this.emailVerificationRepository.remove(emailVerification);
 
     return {
-      message: '이메일 인증을 완료했습니다.',
+      message: '이메일 인증이 완료되었습니다.',
       isEmailVerified: true,
     };
   }

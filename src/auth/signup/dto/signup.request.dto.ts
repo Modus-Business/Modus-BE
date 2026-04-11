@@ -1,6 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsEmail, IsEnum, IsString, Length, Matches } from 'class-validator';
+import {
+  IsEmail,
+  IsEnum,
+  IsString,
+  Length,
+  Matches,
+} from 'class-validator';
 import { UserRole } from '../enums/user-role.enum';
 
 export class SignupRequestDto {
@@ -14,10 +20,18 @@ export class SignupRequestDto {
 
   @ApiProperty({ example: 'user@example.com' })
   @Transform(({ value }) =>
-    typeof value === 'string' ? value.trim() : value,
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
   )
   @IsEmail()
   email!: string;
+
+  @ApiProperty({ example: 'A1b2C3' })
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @IsString()
+  @Length(6, 6)
+  verificationCode!: string;
 
   @ApiProperty({ enum: UserRole, example: UserRole.STUDENT })
   @IsEnum(UserRole)

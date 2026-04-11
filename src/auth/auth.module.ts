@@ -19,11 +19,18 @@ import { LogoutService } from './logout/logout.service';
 import { PasswordService } from './signup/password.service';
 import { SignupController } from './signup/signup.controller';
 import { SignupService } from './signup/signup.service';
+import { SignupVerificationService } from './signup/signup-verification.service';
 import { User } from './signup/entities/user.entity';
+import { SignupVerification } from './signup/entities/signup-verification.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, RefreshToken, EmailVerification]),
+    TypeOrmModule.forFeature([
+      User,
+      RefreshToken,
+      EmailVerification,
+      SignupVerification,
+    ]),
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
@@ -50,6 +57,7 @@ import { User } from './signup/entities/user.entity';
     RolesGuard,
     LoginService,
     SignupService,
+    SignupVerificationService,
     PasswordService,
     TokenService,
     RefreshTokenService,
@@ -64,6 +72,7 @@ import { User } from './signup/entities/user.entity';
     TokenService,
     EmailSenderService,
     EmailVerificationService,
+    SignupVerificationService,
   ],
 })
 export class AuthModule {}

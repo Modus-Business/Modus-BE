@@ -16,6 +16,9 @@ export class SignupResponseDto {
   @ApiProperty({ enum: UserRole, example: UserRole.STUDENT })
   role!: UserRole;
 
+  @ApiProperty({ example: true })
+  isEmailVerified!: boolean;
+
   @ApiProperty({ example: '2026-04-10T12:00:00.000Z' })
   createdAt!: Date;
 }

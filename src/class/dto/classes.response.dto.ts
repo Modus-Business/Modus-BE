@@ -29,7 +29,7 @@ export class ClassSummaryDto {
 
   @ApiProperty({ example: 21, nullable: true })
   studentCount!: number | null;
-
+ 
   @ApiProperty({ example: '2026-04-10T12:00:00.000Z', nullable: true })
   createdAt!: Date | null;
 
