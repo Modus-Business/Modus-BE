@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiCreatedResponse,
   ApiExtraModels,
   ApiOkResponse,
   ApiOperation,
@@ -22,6 +23,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { UserRole } from '../auth/signup/enums/user-role.enum';
+import { ApiErrorResponses } from '../common/decorators/api-error-responses.decorator';
 import { CreateNoticeRequestDto } from './dto/create-notice.request.dto';
 import { DeleteNoticeResponseDto } from './dto/delete-notice.response.dto';
 import {
@@ -43,6 +45,11 @@ export class NoticeController {
   @Post()
   @Roles(UserRole.TEACHER)
   @ApiOperation({ summary: '교사용 공지 작성' })
+  @ApiCreatedResponse({
+    description: '모둠 공지를 새로 작성합니다.',
+    type: NoticeItemDto,
+  })
+  @ApiErrorResponses([400, 401, 403, 404, 500])
   async createNotice(
     @CurrentUser() currentUser: JwtPayload,
     @Body() request: CreateNoticeRequestDto,
@@ -53,6 +60,11 @@ export class NoticeController {
   @Patch(':noticeId')
   @Roles(UserRole.TEACHER)
   @ApiOperation({ summary: '교사용 공지 수정' })
+  @ApiOkResponse({
+    description: '기존 공지를 수정한 결과를 반환합니다.',
+    type: NoticeItemDto,
+  })
+  @ApiErrorResponses([400, 401, 403, 404, 500])
   async updateNotice(
     @CurrentUser() currentUser: JwtPayload,
     @Param('noticeId', new ParseUUIDPipe()) noticeId: string,
@@ -64,6 +76,11 @@ export class NoticeController {
   @Delete(':noticeId')
   @Roles(UserRole.TEACHER)
   @ApiOperation({ summary: '교사용 공지 삭제' })
+  @ApiOkResponse({
+    description: '지정한 공지를 삭제합니다.',
+    type: DeleteNoticeResponseDto,
+  })
+  @ApiErrorResponses([401, 403, 404, 500])
   async deleteNotice(
     @CurrentUser() currentUser: JwtPayload,
     @Param('noticeId', new ParseUUIDPipe()) noticeId: string,
@@ -77,6 +94,7 @@ export class NoticeController {
     description: '특정 모둠의 공지 목록을 반환합니다.',
     type: GetNoticesByGroupSuccessResponseDto,
   })
+  @ApiErrorResponses([401, 403, 404, 500])
   async getNoticesByGroup(
     @CurrentUser() currentUser: JwtPayload,
     @Param('groupId', new ParseUUIDPipe()) groupId: string,

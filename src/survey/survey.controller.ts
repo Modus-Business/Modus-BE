@@ -12,6 +12,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { UserRole } from '../auth/signup/enums/user-role.enum';
+import { ApiErrorResponses } from '../common/decorators/api-error-responses.decorator';
 import { SubmitSurveyRequestDto } from './dto/submit-survey.request.dto';
 import { GetMySurveySuccessResponseDto } from './dto/survey-get.response.dto';
 import { SurveyResponseDto } from './dto/survey.response.dto';
@@ -28,6 +29,11 @@ export class SurveyController {
   @Post()
   @Roles(UserRole.STUDENT)
   @ApiOperation({ summary: '학생용 설문 제출' })
+  @ApiOkResponse({
+    description: '학생 설문 응답을 저장하고 저장된 결과를 반환합니다.',
+    type: SurveyResponseDto,
+  })
+  @ApiErrorResponses([400, 401, 403, 500])
   async submitSurvey(
     @CurrentUser() currentUser: JwtPayload,
     @Body() request: SubmitSurveyRequestDto,
@@ -42,6 +48,7 @@ export class SurveyController {
     description: '현재 로그인한 학생의 설문 데이터를 반환합니다.',
     type: GetMySurveySuccessResponseDto,
   })
+  @ApiErrorResponses([401, 403, 500])
   async getMySurvey(
     @CurrentUser() currentUser: JwtPayload,
   ): Promise<SurveyResponseDto | null> {

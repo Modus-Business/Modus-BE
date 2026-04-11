@@ -9,6 +9,7 @@ import {
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { ApiErrorResponses } from '../common/decorators/api-error-responses.decorator';
 import { GetMeSettingsSuccessResponseDto } from './dto/me-get.response.dto';
 import { MeSettingsResponseDto } from './dto/me-settings.response.dto';
 import { MeService } from './me.service';
@@ -27,6 +28,7 @@ export class MeController {
     description: '설정 화면에 필요한 사용자 정보를 반환합니다.',
     type: GetMeSettingsSuccessResponseDto,
   })
+  @ApiErrorResponses([401, 500])
   async getSettings(
     @CurrentUser() currentUser: JwtPayload,
   ): Promise<MeSettingsResponseDto> {

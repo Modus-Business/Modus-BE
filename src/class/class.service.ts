@@ -9,6 +9,7 @@ import { randomInt } from 'node:crypto';
 import { Repository } from 'typeorm';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { UserRole } from '../auth/signup/enums/user-role.enum';
+import { ClassParticipantsResponseDto } from './dto/class-participants.response.dto';
 import { ClassesResponseDto } from './dto/classes.response.dto';
 import { CreateClassRequestDto } from './dto/create-class.request.dto';
 import { CreateClassResponseDto } from './dto/create-class.response.dto';
@@ -42,12 +43,55 @@ export class ClassService {
     throw new ForbiddenException('지원하지 않는 사용자 역할입니다.');
   }
 
+  async getClassParticipants(
+    currentUser: JwtPayload,
+    classId: string,
+  ): Promise<ClassParticipantsResponseDto> {
+    const classroom = await this.getTeacherOwnedClassroom(currentUser, classId);
+
+    const classParticipants = await this.classParticipantRepository.find({
+      where: {
+        classId,
+      },
+      relations: {
+        student: true,
+        groupMember: {
+          group: true,
+        },
+        groupNickname: true,
+      },
+      order: {
+        joinedAt: 'ASC',
+      },
+    });
+
+    return {
+      classId: classroom.classId,
+      className: classroom.name,
+      participants: classParticipants.map((classParticipant) => ({
+        classParticipantId: classParticipant.classParticipantId,
+        studentId: classParticipant.studentId,
+        studentName: classParticipant.student.name,
+        email: classParticipant.student.email,
+        nickname: classParticipant.groupNickname?.nickname ?? null,
+        group: classParticipant.groupMember
+          ? {
+              groupId: classParticipant.groupMember.groupId,
+              name: classParticipant.groupMember.group.name,
+            }
+          : null,
+        joinedAt: classParticipant.joinedAt,
+        groupJoinedAt: classParticipant.groupMember?.joinedAt ?? null,
+      })),
+    };
+  }
+
   async createClass(
     currentUser: JwtPayload,
     request: CreateClassRequestDto,
   ): Promise<CreateClassResponseDto> {
     if (currentUser.role !== UserRole.TEACHER) {
-      throw new ForbiddenException('교강사만 수업을 생성할 수 있습니다.');
+      throw new ForbiddenException('교사만 수업을 생성할 수 있습니다.');
     }
 
     const classroom = this.classroomRepository.create({
@@ -73,25 +117,7 @@ export class ClassService {
     currentUser: JwtPayload,
     classId: string,
   ): Promise<RegenerateClassCodeResponseDto> {
-    if (currentUser.role !== UserRole.TEACHER) {
-      throw new ForbiddenException('교강사만 수업 코드를 재발급할 수 있습니다.');
-    }
-
-    const classroom = await this.classroomRepository.findOne({
-      where: {
-        classId,
-      },
-    });
-
-    if (!classroom) {
-      throw new NotFoundException('해당 수업을 찾을 수 없습니다.');
-    }
-
-    if (classroom.teacherId !== currentUser.sub) {
-      throw new ForbiddenException(
-        '본인이 만든 수업 코드만 재발급할 수 있습니다.',
-      );
-    }
+    const classroom = await this.getTeacherOwnedClassroom(currentUser, classId);
 
     classroom.classCode = await this.generateUniqueClassCode(
       classroom.classId,
@@ -112,7 +138,7 @@ export class ClassService {
     request: JoinClassRequestDto,
   ): Promise<JoinClassResponseDto> {
     if (currentUser.role !== UserRole.STUDENT) {
-      throw new ForbiddenException('수강생만 수업에 참여할 수 있습니다.');
+      throw new ForbiddenException('학생만 수업에 참여할 수 있습니다.');
     }
 
     const classroom = await this.classroomRepository.findOne({
@@ -219,6 +245,31 @@ export class ClassService {
         myGroup: null,
       })),
     };
+  }
+
+  private async getTeacherOwnedClassroom(
+    currentUser: JwtPayload,
+    classId: string,
+  ): Promise<Classroom> {
+    if (currentUser.role !== UserRole.TEACHER) {
+      throw new ForbiddenException('교사만 수업 정보를 조회할 수 있습니다.');
+    }
+
+    const classroom = await this.classroomRepository.findOne({
+      where: {
+        classId,
+      },
+    });
+
+    if (!classroom) {
+      throw new NotFoundException('해당 수업을 찾을 수 없습니다.');
+    }
+
+    if (classroom.teacherId !== currentUser.sub) {
+      throw new ForbiddenException('본인 수업만 조회할 수 있습니다.');
+    }
+
+    return classroom;
   }
 
   private async generateUniqueClassCode(
