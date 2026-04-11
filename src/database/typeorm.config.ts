@@ -1,7 +1,6 @@
 import { extname } from 'node:path';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { DataSourceOptions } from 'typeorm';
-import { EmailVerification } from '../auth/email/entities/email-verification.entity';
 import { RefreshToken } from '../auth/login/refresh-token/entities/refresh-token.entity';
 import { SignupVerification } from '../auth/signup/entities/signup-verification.entity';
 import { User } from '../auth/signup/entities/user.entity';
@@ -16,7 +15,6 @@ import { Survey } from '../survey/entities/survey.entity';
 
 const databaseEntities = [
   User,
-  EmailVerification,
   SignupVerification,
   RefreshToken,
   Classroom,
