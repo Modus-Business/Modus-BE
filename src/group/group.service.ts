@@ -16,19 +16,18 @@ import { CreateGroupResponseDto } from './dto/create-group.response.dto';
 import { DeleteGroupResponseDto } from './dto/delete-group.response.dto';
 import { GroupDetailResponseDto } from './dto/group-detail.response.dto';
 import { GroupListResponseDto } from './dto/group-list.response.dto';
-import { MyGroupResponseDto } from './dto/my-group.response.dto';
 import { UpdateGroupRequestDto } from './dto/update-group.request.dto';
 import { GroupMember } from './entities/group-member.entity';
 import { GroupNickname } from './entities/group-nickname.entity';
 import { Group } from './entities/group.entity';
 
 const GROUP_NICKNAME_ADJECTIVES = [
-  '푸른',
+  '빠른',
   '조용한',
   '반짝이는',
-  '담대한',
+  '느긋한',
   '부드러운',
-  '느린',
+  '따뜻한',
   '기민한',
   '영리한',
   '차분한',
@@ -37,15 +36,15 @@ const GROUP_NICKNAME_ADJECTIVES = [
 
 const GROUP_NICKNAME_NOUNS = [
   '파도',
-  '나침반',
+  '해변',
   '호수',
-  '안개',
+  '별빛',
   '유성',
   '메아리',
   '고래',
   '구름',
   '온도',
-  '달빛',
+  '노을',
 ];
 
 @Injectable()
@@ -167,7 +166,11 @@ export class GroupService {
     );
 
     if (participantsToAdd.length > 0) {
-      await this.addParticipantsToGroup(groupId, group.classId, participantsToAdd);
+      await this.addParticipantsToGroup(
+        groupId,
+        group.classId,
+        participantsToAdd,
+      );
     }
 
     group.name = request.name.trim();
@@ -197,7 +200,7 @@ export class GroupService {
     await this.groupRepository.remove(group);
 
     return {
-      message: '모둠을 삭제했습니다.',
+      message: '모둠이 삭제되었습니다.',
     };
   }
 
@@ -243,52 +246,6 @@ export class GroupService {
         memberCount: savedGroup.groupMembers.length,
         createdAt: savedGroup.createdAt,
       })),
-    };
-  }
-
-  async getMyGroup(
-    currentUser: JwtPayload,
-    classId: string,
-  ): Promise<MyGroupResponseDto> {
-    if (currentUser.role !== UserRole.STUDENT) {
-      throw new ForbiddenException('학생만 내 모둠을 조회할 수 있습니다.');
-    }
-
-    const classParticipant = await this.classParticipantRepository.findOne({
-      where: {
-        classId,
-        studentId: currentUser.sub,
-      },
-      relations: {
-        groupMember: {
-          group: {
-            groupMembers: true,
-          },
-        },
-      },
-    });
-
-    if (!classParticipant) {
-      throw new NotFoundException('해당 수업 참여 정보를 찾을 수 없습니다.');
-    }
-
-    if (!classParticipant.groupMember) {
-      return {
-        hasGroup: false,
-        group: null,
-        message: '참여 중인 모둠이 없습니다.',
-      };
-    }
-
-    return {
-      hasGroup: true,
-      group: {
-        groupId: classParticipant.groupMember.groupId,
-        classId: classParticipant.groupMember.group.classId,
-        name: classParticipant.groupMember.group.name,
-        memberCount: classParticipant.groupMember.group.groupMembers.length,
-      },
-      message: null,
     };
   }
 

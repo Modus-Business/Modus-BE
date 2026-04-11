@@ -30,12 +30,10 @@ import { DeleteGroupResponseDto } from './dto/delete-group.response.dto';
 import {
   GetGroupDetailSuccessResponseDto,
   GetGroupsByClassSuccessResponseDto,
-  GetMyGroupSuccessResponseDto,
   GroupGetExtraModels,
 } from './dto/group-get.response.dto';
 import { GroupDetailResponseDto } from './dto/group-detail.response.dto';
 import { GroupListResponseDto } from './dto/group-list.response.dto';
-import { MyGroupResponseDto } from './dto/my-group.response.dto';
 import { UpdateGroupRequestDto } from './dto/update-group.request.dto';
 import { GroupService } from './group.service';
 
@@ -106,21 +104,6 @@ export class GroupController {
     @Param('classId', new ParseUUIDPipe()) classId: string,
   ): Promise<GroupListResponseDto> {
     return this.groupService.getGroupsByClass(currentUser, classId);
-  }
-
-  @Get('my/:classId')
-  @Roles(UserRole.STUDENT)
-  @ApiOperation({ summary: '학생용 내 모둠 조회' })
-  @ApiOkResponse({
-    description: '특정 수업에서 내 모둠 정보를 반환합니다.',
-    type: GetMyGroupSuccessResponseDto,
-  })
-  @ApiErrorResponses([401, 403, 404, 500])
-  async getMyGroup(
-    @CurrentUser() currentUser: JwtPayload,
-    @Param('classId', new ParseUUIDPipe()) classId: string,
-  ): Promise<MyGroupResponseDto> {
-    return this.groupService.getMyGroup(currentUser, classId);
   }
 
   @Get(':groupId')
