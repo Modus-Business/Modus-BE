@@ -93,7 +93,8 @@ Swagger에서 바로 확인해야 하는 주요 흐름만 정리한 문서입니
 ## Notices
 
 ### `POST /notices`
-- 교강사 공지 작성 API입니다.
+- 교강사 수업 공지 작성 API입니다.
+- 요청 본문은 `classId` 기준입니다.
 
 ### `PATCH /notices/:noticeId`
 - 교강사 공지 수정 API입니다.
@@ -101,8 +102,8 @@ Swagger에서 바로 확인해야 하는 주요 흐름만 정리한 문서입니
 ### `DELETE /notices/:noticeId`
 - 교강사 공지 삭제 API입니다.
 
-### `GET /notices/group/:groupId`
-- 모둠 공지 목록 조회 API입니다.
+### `GET /notices/class/:classId`
+- 수업 공지 목록 조회 API입니다.
 
 ## Assignments
 

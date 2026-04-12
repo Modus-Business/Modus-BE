@@ -12,7 +12,7 @@ export class CreateNoticeRequestDto {
   title!: string;
 
   @ApiProperty({
-    example: '오후 3시까지 초안 제출 후 모둠별 피드백을 진행합니다.',
+    example: '오후 3시까지 초안 제출 후 전체 피드백을 진행합니다.',
   })
   @Transform(({ value }) =>
     typeof value === 'string' ? value.trim() : value,
@@ -21,7 +21,7 @@ export class CreateNoticeRequestDto {
   @Length(1, 2000)
   content!: string;
 
-  @ApiProperty({ example: 'group-1' })
+  @ApiProperty({ example: '11111111-1111-1111-1111-111111111111' })
   @IsUUID()
-  groupId!: string;
+  classId!: string;
 }

@@ -8,7 +8,6 @@ import { AppModule } from '../src/app.module';
 import { UserRole } from '../src/auth/signup/enums/user-role.enum';
 import { User } from '../src/auth/signup/entities/user.entity';
 import { Classroom } from '../src/class/entities/class.entity';
-import { Group } from '../src/group/entities/group.entity';
 import { Notice } from '../src/notice/entities/notice.entity';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { ResponseInterceptor } from '../src/common/interceptors/response.interceptor';
@@ -17,7 +16,6 @@ describe('Notice (e2e)', () => {
   let app: INestApplication<App>;
   let userRepository: Repository<User>;
   let classroomRepository: Repository<Classroom>;
-  let groupRepository: Repository<Group>;
   let noticeRepository: Repository<Notice>;
   const createdEmails: string[] = [];
   const createdClassIds: string[] = [];
@@ -43,23 +41,12 @@ describe('Notice (e2e)', () => {
     classroomRepository = app.get<Repository<Classroom>>(
       getRepositoryToken(Classroom),
     );
-    groupRepository = app.get<Repository<Group>>(getRepositoryToken(Group));
     noticeRepository = app.get<Repository<Notice>>(getRepositoryToken(Notice));
   });
 
   afterAll(async () => {
     if (createdClassIds.length > 0) {
-      const groups = await groupRepository.find({
-        where: { classId: In(createdClassIds) },
-      });
-
-      if (groups.length > 0) {
-        await noticeRepository.delete({
-          groupId: In(groups.map((group) => group.groupId)),
-        });
-      }
-
-      await groupRepository.delete({
+      await noticeRepository.delete({
         classId: In(createdClassIds),
       });
       await classroomRepository.delete({
@@ -76,7 +63,7 @@ describe('Notice (e2e)', () => {
     await app.close();
   });
 
-  it('교강사는 공지를 작성하고 수정하고 삭제할 수 있으며 수강생은 목록을 조회할 수 있다', async () => {
+  it('교강사는 공지를 작성, 수정, 삭제할 수 있고 학생은 수업 공지 목록을 조회할 수 있다', async () => {
     const timestamp = Date.now();
     const teacherEmail = `teacher-notice-${timestamp}@example.com`;
     const studentEmail = `student-notice-${timestamp}@example.com`;
@@ -135,10 +122,6 @@ describe('Notice (e2e)', () => {
     const classCode = createClassResponse.body.data.classCode as string;
     createdClassIds.push(classId);
 
-    const student = await userRepository.findOneByOrFail({
-      email: studentEmail,
-    });
-
     await request(app.getHttpServer())
       .post('/classes/join')
       .set('Authorization', `Bearer ${studentAccessToken}`)
@@ -147,23 +130,11 @@ describe('Notice (e2e)', () => {
       })
       .expect(201);
 
-    const createGroupResponse = await request(app.getHttpServer())
-      .post('/groups')
-      .set('Authorization', `Bearer ${teacherAccessToken}`)
-      .send({
-        classId,
-        name: 'Group 3',
-        studentIds: [student.userId],
-      })
-      .expect(201);
-
-    const groupId = createGroupResponse.body.data.groupId as string;
-
     const createNoticeResponse = await request(app.getHttpServer())
       .post('/notices')
       .set('Authorization', `Bearer ${teacherAccessToken}`)
       .send({
-        groupId,
+        classId,
         title: 'Today Notice',
         content: 'Submit the first draft by 3 PM.',
       })
@@ -171,6 +142,7 @@ describe('Notice (e2e)', () => {
 
     const noticeId = createNoticeResponse.body.data.noticeId as string;
     expect(createNoticeResponse.body.data.title).toBe('Today Notice');
+    expect(createNoticeResponse.body.data.classId).toBe(classId);
 
     const updateNoticeResponse = await request(app.getHttpServer())
       .patch(`/notices/${noticeId}`)
@@ -187,12 +159,13 @@ describe('Notice (e2e)', () => {
     );
 
     const noticeListResponse = await request(app.getHttpServer())
-      .get(`/notices/group/${groupId}`)
+      .get(`/notices/class/${classId}`)
       .set('Authorization', `Bearer ${studentAccessToken}`)
       .expect(200);
 
     expect(noticeListResponse.body.data.notices).toEqual([
       expect.objectContaining({
+        classId,
         title: 'Updated Notice',
         content: 'Submit the updated draft by 4 PM.',
       }),
@@ -203,8 +176,6 @@ describe('Notice (e2e)', () => {
       .set('Authorization', `Bearer ${teacherAccessToken}`)
       .expect(200);
 
-    expect(deleteNoticeResponse.body.data.message).toBe(
-      '공지사항이 삭제되었습니다.',
-    );
+    expect(deleteNoticeResponse.body.data.message).toBe('공지사항을 삭제했습니다.');
   });
 });

@@ -7,7 +7,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { UserRole } from '../auth/signup/enums/user-role.enum';
-import { Group } from '../group/entities/group.entity';
+import { ClassParticipant } from '../class/entities/class-participant.entity';
+import { Classroom } from '../class/entities/class.entity';
 import { CreateNoticeRequestDto } from './dto/create-notice.request.dto';
 import { DeleteNoticeResponseDto } from './dto/delete-notice.response.dto';
 import { NoticeItemDto, NoticeListResponseDto } from './dto/notice.response.dto';
@@ -19,8 +20,10 @@ export class NoticeService {
   constructor(
     @InjectRepository(Notice)
     private readonly noticeRepository: Repository<Notice>,
-    @InjectRepository(Group)
-    private readonly groupRepository: Repository<Group>,
+    @InjectRepository(Classroom)
+    private readonly classroomRepository: Repository<Classroom>,
+    @InjectRepository(ClassParticipant)
+    private readonly classParticipantRepository: Repository<ClassParticipant>,
   ) {}
 
   async createNotice(
@@ -31,10 +34,13 @@ export class NoticeService {
       throw new ForbiddenException('교강사만 공지를 작성할 수 있습니다.');
     }
 
-    const group = await this.getAccessibleGroup(currentUser, request.groupId);
+    const classroom = await this.getTeacherAccessibleClassroom(
+      currentUser,
+      request.classId,
+    );
 
     const notice = this.noticeRepository.create({
-      groupId: group.groupId,
+      classId: classroom.classId,
       title: request.title.trim(),
       content: request.content.trim(),
     });
@@ -71,15 +77,15 @@ export class NoticeService {
     };
   }
 
-  async getNoticesByGroup(
+  async getNoticesByClass(
     currentUser: JwtPayload,
-    groupId: string,
+    classId: string,
   ): Promise<NoticeListResponseDto> {
-    await this.getAccessibleGroup(currentUser, groupId);
+    await this.getAccessibleClassroom(currentUser, classId);
 
     const notices = await this.noticeRepository.find({
       where: {
-        groupId,
+        classId,
       },
       order: {
         createdAt: 'DESC',
@@ -106,9 +112,7 @@ export class NoticeService {
         noticeId,
       },
       relations: {
-        group: {
-          classroom: true,
-        },
+        classroom: true,
       },
     });
 
@@ -116,56 +120,71 @@ export class NoticeService {
       throw new NotFoundException('해당 공지사항을 찾을 수 없습니다.');
     }
 
-    if (notice.group.classroom.teacherId !== currentUser.sub) {
+    if (notice.classroom.teacherId !== currentUser.sub) {
       throw new ForbiddenException(
-        '본인이 만든 수업 공지만 수정하거나 삭제할 수 있습니다.',
+        '본인 수업의 공지만 수정하거나 삭제할 수 있습니다.',
       );
     }
 
     return notice;
   }
 
-  private async getAccessibleGroup(
+  private async getTeacherAccessibleClassroom(
     currentUser: JwtPayload,
-    groupId: string,
-  ): Promise<Group> {
-    const group = await this.groupRepository.findOne({
+    classId: string,
+  ): Promise<Classroom> {
+    const classroom = await this.classroomRepository.findOne({
       where: {
-        groupId,
-      },
-      relations: {
-        classroom: true,
-        groupMembers: {
-          classParticipant: true,
-        },
+        classId,
       },
     });
 
-    if (!group) {
-      throw new NotFoundException('해당 모둠을 찾을 수 없습니다.');
+    if (!classroom) {
+      throw new NotFoundException('해당 수업을 찾을 수 없습니다.');
+    }
+
+    if (classroom.teacherId !== currentUser.sub) {
+      throw new ForbiddenException('본인 수업의 공지만 작성할 수 있습니다.');
+    }
+
+    return classroom;
+  }
+
+  private async getAccessibleClassroom(
+    currentUser: JwtPayload,
+    classId: string,
+  ): Promise<Classroom> {
+    const classroom = await this.classroomRepository.findOne({
+      where: {
+        classId,
+      },
+    });
+
+    if (!classroom) {
+      throw new NotFoundException('해당 수업을 찾을 수 없습니다.');
     }
 
     if (currentUser.role === UserRole.TEACHER) {
-      if (group.classroom.teacherId !== currentUser.sub) {
-        throw new ForbiddenException(
-          '본인이 만든 수업의 모둠 공지만 접근할 수 있습니다.',
-        );
+      if (classroom.teacherId !== currentUser.sub) {
+        throw new ForbiddenException('본인 수업의 공지만 조회할 수 있습니다.');
       }
 
-      return group;
+      return classroom;
     }
 
     if (currentUser.role === UserRole.STUDENT) {
-      const isMember = group.groupMembers.some(
-        (groupMember) =>
-          groupMember.classParticipant.studentId === currentUser.sub,
-      );
+      const participant = await this.classParticipantRepository.findOne({
+        where: {
+          classId,
+          studentId: currentUser.sub,
+        },
+      });
 
-      if (!isMember) {
-        throw new ForbiddenException('본인이 속한 모둠 공지만 접근할 수 있습니다.');
+      if (!participant) {
+        throw new ForbiddenException('본인이 참여한 수업의 공지만 조회할 수 있습니다.');
       }
 
-      return group;
+      return classroom;
     }
 
     throw new ForbiddenException('지원하지 않는 사용자 역할입니다.');
@@ -174,7 +193,7 @@ export class NoticeService {
   private toNoticeItem(notice: Notice): NoticeItemDto {
     return {
       noticeId: notice.noticeId,
-      groupId: notice.groupId,
+      classId: notice.classId,
       title: notice.title,
       content: notice.content,
       createdAt: notice.createdAt,

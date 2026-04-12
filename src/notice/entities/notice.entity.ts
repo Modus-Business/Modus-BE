@@ -7,15 +7,15 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Group } from '../../group/entities/group.entity';
+import { Classroom } from '../../class/entities/class.entity';
 
 @Entity({ name: 'notices' })
 export class Notice {
   @PrimaryGeneratedColumn('uuid')
   noticeId!: string;
 
-  @Column({ type: 'uuid', name: 'group_id' })
-  groupId!: string;
+  @Column({ type: 'uuid', name: 'class_id' })
+  classId!: string;
 
   @Column({ type: 'varchar', length: 100 })
   title!: string;
@@ -29,7 +29,7 @@ export class Notice {
   @UpdateDateColumn()
   updatedAt!: Date;
 
-  @ManyToOne(() => Group, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'group_id' })
-  group!: Group;
+  @ManyToOne(() => Classroom, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'class_id' })
+  classroom!: Classroom;
 }

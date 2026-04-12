@@ -27,7 +27,7 @@ import { ApiErrorResponses } from '../common/decorators/api-error-responses.deco
 import { CreateNoticeRequestDto } from './dto/create-notice.request.dto';
 import { DeleteNoticeResponseDto } from './dto/delete-notice.response.dto';
 import {
-  GetNoticesByGroupSuccessResponseDto,
+  GetNoticesByClassSuccessResponseDto,
   NoticeGetExtraModels,
 } from './dto/notice-get.response.dto';
 import { NoticeItemDto, NoticeListResponseDto } from './dto/notice.response.dto';
@@ -44,9 +44,9 @@ export class NoticeController {
 
   @Post()
   @Roles(UserRole.TEACHER)
-  @ApiOperation({ summary: '교사용 공지 작성' })
+  @ApiOperation({ summary: '교강사 공지 작성' })
   @ApiCreatedResponse({
-    description: '모둠 공지를 새로 작성합니다.',
+    description: '수업 공지를 새로 작성합니다.',
     type: NoticeItemDto,
   })
   @ApiErrorResponses([400, 401, 403, 404, 500])
@@ -59,7 +59,7 @@ export class NoticeController {
 
   @Patch(':noticeId')
   @Roles(UserRole.TEACHER)
-  @ApiOperation({ summary: '교사용 공지 수정' })
+  @ApiOperation({ summary: '교강사 공지 수정' })
   @ApiOkResponse({
     description: '기존 공지를 수정한 결과를 반환합니다.',
     type: NoticeItemDto,
@@ -75,7 +75,7 @@ export class NoticeController {
 
   @Delete(':noticeId')
   @Roles(UserRole.TEACHER)
-  @ApiOperation({ summary: '교사용 공지 삭제' })
+  @ApiOperation({ summary: '교강사 공지 삭제' })
   @ApiOkResponse({
     description: '지정한 공지를 삭제합니다.',
     type: DeleteNoticeResponseDto,
@@ -88,17 +88,17 @@ export class NoticeController {
     return this.noticeService.deleteNotice(currentUser, noticeId);
   }
 
-  @Get('group/:groupId')
-  @ApiOperation({ summary: '모둠 공지 목록 조회' })
+  @Get('class/:classId')
+  @ApiOperation({ summary: '수업 공지 목록 조회' })
   @ApiOkResponse({
-    description: '특정 모둠의 공지 목록을 반환합니다.',
-    type: GetNoticesByGroupSuccessResponseDto,
+    description: '특정 수업의 공지 목록을 반환합니다.',
+    type: GetNoticesByClassSuccessResponseDto,
   })
   @ApiErrorResponses([401, 403, 404, 500])
-  async getNoticesByGroup(
+  async getNoticesByClass(
     @CurrentUser() currentUser: JwtPayload,
-    @Param('groupId', new ParseUUIDPipe()) groupId: string,
+    @Param('classId', new ParseUUIDPipe()) classId: string,
   ): Promise<NoticeListResponseDto> {
-    return this.noticeService.getNoticesByGroup(currentUser, groupId);
+    return this.noticeService.getNoticesByClass(currentUser, classId);
   }
 }

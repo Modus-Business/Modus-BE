@@ -3,14 +3,16 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserRole } from '../auth/signup/enums/user-role.enum';
-import { Group } from '../group/entities/group.entity';
+import { ClassParticipant } from '../class/entities/class-participant.entity';
+import { Classroom } from '../class/entities/class.entity';
 import { NoticeService } from './notice.service';
 import { Notice } from './entities/notice.entity';
 
 describe('NoticeService', () => {
   let noticeService: NoticeService;
   let noticeRepository: jest.Mocked<Repository<Notice>>;
-  let groupRepository: jest.Mocked<Repository<Group>>;
+  let classroomRepository: jest.Mocked<Repository<Classroom>>;
+  let classParticipantRepository: jest.Mocked<Repository<ClassParticipant>>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -27,7 +29,13 @@ describe('NoticeService', () => {
           },
         },
         {
-          provide: getRepositoryToken(Group),
+          provide: getRepositoryToken(Classroom),
+          useValue: {
+            findOne: jest.fn(),
+          },
+        },
+        {
+          provide: getRepositoryToken(ClassParticipant),
           useValue: {
             findOne: jest.fn(),
           },
@@ -37,28 +45,26 @@ describe('NoticeService', () => {
 
     noticeService = module.get<NoticeService>(NoticeService);
     noticeRepository = module.get(getRepositoryToken(Notice));
-    groupRepository = module.get(getRepositoryToken(Group));
+    classroomRepository = module.get(getRepositoryToken(Classroom));
+    classParticipantRepository = module.get(
+      getRepositoryToken(ClassParticipant),
+    );
   });
 
-  it('교강사는 공지를 작성할 수 있다', async () => {
-    groupRepository.findOne.mockResolvedValue({
-      groupId: 'group-1',
+  it('교강사는 수업 공지를 작성할 수 있다', async () => {
+    classroomRepository.findOne.mockResolvedValue({
       classId: 'class-1',
-      name: '모둠 3',
-      classroom: {
-        teacherId: 'teacher-1',
-      },
-      groupMembers: [],
-    } as unknown as Group);
+      teacherId: 'teacher-1',
+      name: '소프트웨어 공학',
+    } as Classroom);
     noticeRepository.create.mockImplementation((input) => input as Notice);
     noticeRepository.save.mockResolvedValue({
       noticeId: 'notice-1',
-      groupId: 'group-1',
+      classId: 'class-1',
       title: '오늘 수업 공지',
       content: '오후 3시까지 초안 제출',
       createdAt: new Date('2026-04-10T12:00:00.000Z'),
       updatedAt: new Date('2026-04-10T12:00:00.000Z'),
-      group: undefined as never,
     } as Notice);
 
     const result = await noticeService.createNotice(
@@ -68,27 +74,26 @@ describe('NoticeService', () => {
         role: UserRole.TEACHER,
       },
       {
-        groupId: '11111111-1111-1111-1111-111111111111',
+        classId: '11111111-1111-1111-1111-111111111111',
         title: '오늘 수업 공지',
         content: '오후 3시까지 초안 제출',
       },
     );
 
     expect(result.title).toBe('오늘 수업 공지');
+    expect(result.classId).toBe('class-1');
   });
 
   it('교강사는 공지를 수정할 수 있다', async () => {
     noticeRepository.findOne.mockResolvedValue({
       noticeId: 'notice-1',
-      groupId: 'group-1',
+      classId: 'class-1',
       title: '기존 제목',
       content: '기존 내용',
       createdAt: new Date('2026-04-10T12:00:00.000Z'),
       updatedAt: new Date('2026-04-10T12:00:00.000Z'),
-      group: {
-        classroom: {
-          teacherId: 'teacher-1',
-        },
+      classroom: {
+        teacherId: 'teacher-1',
       },
     } as unknown as Notice);
     noticeRepository.save.mockImplementation(async (input) => input as Notice);
@@ -113,15 +118,13 @@ describe('NoticeService', () => {
   it('교강사는 공지를 삭제할 수 있다', async () => {
     const notice = {
       noticeId: 'notice-1',
-      groupId: 'group-1',
+      classId: 'class-1',
       title: '기존 제목',
       content: '기존 내용',
       createdAt: new Date('2026-04-10T12:00:00.000Z'),
       updatedAt: new Date('2026-04-10T12:00:00.000Z'),
-      group: {
-        classroom: {
-          teacherId: 'teacher-1',
-        },
+      classroom: {
+        teacherId: 'teacher-1',
       },
     } as unknown as Notice;
     noticeRepository.findOne.mockResolvedValue(notice);
@@ -136,29 +139,24 @@ describe('NoticeService', () => {
       '11111111-1111-1111-1111-111111111111',
     );
 
-    expect(result.message).toBe('공지사항이 삭제되었습니다.');
+    expect(result.message).toBe('공지사항을 삭제했습니다.');
   });
 
-  it('수강생은 본인 모둠 공지 목록을 조회할 수 있다', async () => {
-    groupRepository.findOne.mockResolvedValue({
-      groupId: 'group-1',
+  it('학생은 자신이 참여한 수업의 공지 목록을 조회할 수 있다', async () => {
+    classroomRepository.findOne.mockResolvedValue({
       classId: 'class-1',
-      name: '모둠 3',
-      classroom: {
-        teacherId: 'teacher-1',
-      },
-      groupMembers: [
-        {
-          classParticipant: {
-            studentId: 'student-1',
-          },
-        },
-      ],
-    } as unknown as Group);
+      teacherId: 'teacher-1',
+      name: '소프트웨어 공학',
+    } as Classroom);
+    classParticipantRepository.findOne.mockResolvedValue({
+      classParticipantId: 'participant-1',
+      classId: 'class-1',
+      studentId: 'student-1',
+    } as ClassParticipant);
     noticeRepository.find.mockResolvedValue([
       {
         noticeId: 'notice-1',
-        groupId: 'group-1',
+        classId: 'class-1',
         title: '오늘 수업 공지',
         content: '오후 3시까지 초안 제출',
         createdAt: new Date('2026-04-10T12:00:00.000Z'),
@@ -166,7 +164,7 @@ describe('NoticeService', () => {
       } as Notice,
     ]);
 
-    const result = await noticeService.getNoticesByGroup(
+    const result = await noticeService.getNoticesByClass(
       {
         sub: 'student-1',
         email: 'student@example.com',
@@ -176,21 +174,19 @@ describe('NoticeService', () => {
     );
 
     expect(result.notices).toHaveLength(1);
+    expect(result.notices[0].classId).toBe('class-1');
   });
 
-  it('본인 모둠이 아니면 수강생은 공지에 접근할 수 없다', async () => {
-    groupRepository.findOne.mockResolvedValue({
-      groupId: 'group-1',
+  it('참여하지 않은 학생은 수업 공지를 조회할 수 없다', async () => {
+    classroomRepository.findOne.mockResolvedValue({
       classId: 'class-1',
-      name: '모둠 3',
-      classroom: {
-        teacherId: 'teacher-1',
-      },
-      groupMembers: [],
-    } as unknown as Group);
+      teacherId: 'teacher-1',
+      name: '소프트웨어 공학',
+    } as Classroom);
+    classParticipantRepository.findOne.mockResolvedValue(null);
 
     await expect(
-      noticeService.getNoticesByGroup(
+      noticeService.getNoticesByClass(
         {
           sub: 'student-1',
           email: 'student@example.com',
@@ -200,5 +196,4 @@ describe('NoticeService', () => {
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
-
 });
