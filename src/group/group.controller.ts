@@ -28,13 +28,10 @@ import { CreateGroupRequestDto } from './dto/create-group.request.dto';
 import { CreateGroupResponseDto } from './dto/create-group.response.dto';
 import { DeleteGroupResponseDto } from './dto/delete-group.response.dto';
 import {
-  GetGroupsByClassSuccessResponseDto,
-  GetStudentGroupDetailSuccessResponseDto,
-  GetTeacherGroupDetailSuccessResponseDto,
+  GetGroupDetailSuccessResponseDto,
   GroupGetExtraModels,
 } from './dto/group-get.response.dto';
 import { GroupDetailResponseDto } from './dto/group-detail.response.dto';
-import { GroupListResponseDto } from './dto/group-list.response.dto';
 import { UpdateGroupRequestDto } from './dto/update-group.request.dto';
 import { GroupService } from './group.service';
 
@@ -48,9 +45,9 @@ export class GroupController {
 
   @Post()
   @Roles(UserRole.TEACHER)
-  @ApiOperation({ summary: '교사용 모둠 생성' })
+  @ApiOperation({ summary: '교강사 모둠 생성' })
   @ApiCreatedResponse({
-    description: '수업 안에 새 모둠을 생성하고 배정된 학생 정보를 반환합니다.',
+    description: '수업 안에 새 모둠을 생성하고 배정된 학생 수를 반환합니다.',
     type: CreateGroupResponseDto,
   })
   @ApiErrorResponses([400, 401, 403, 404, 409, 500])
@@ -63,7 +60,7 @@ export class GroupController {
 
   @Patch(':groupId')
   @Roles(UserRole.TEACHER)
-  @ApiOperation({ summary: '교사용 모둠 수정' })
+  @ApiOperation({ summary: '교강사 모둠 수정' })
   @ApiOkResponse({
     description: '모둠 이름과 모둠 구성원을 수정한 결과를 반환합니다.',
     type: CreateGroupResponseDto,
@@ -79,7 +76,7 @@ export class GroupController {
 
   @Delete(':groupId')
   @Roles(UserRole.TEACHER)
-  @ApiOperation({ summary: '교사용 모둠 삭제' })
+  @ApiOperation({ summary: '교강사 모둠 삭제' })
   @ApiOkResponse({
     description: '지정한 모둠을 삭제합니다.',
     type: DeleteGroupResponseDto,
@@ -92,48 +89,18 @@ export class GroupController {
     return this.groupService.deleteGroup(currentUser, groupId);
   }
 
-  @Get('class/:classId')
-  @Roles(UserRole.TEACHER)
-  @ApiOperation({ summary: '교사용 모둠 목록 조회' })
+  @Get(':groupId')
+  @ApiOperation({ summary: '모둠 조회' })
   @ApiOkResponse({
-    description: '특정 수업의 모둠 목록을 반환합니다.',
-    type: GetGroupsByClassSuccessResponseDto,
+    description:
+      '교강사는 실명 기준 멤버 목록을, 학생은 익명 닉네임 기준 멤버 목록을 반환합니다.',
+    type: GetGroupDetailSuccessResponseDto,
   })
   @ApiErrorResponses([401, 403, 404, 500])
-  async getGroupsByClass(
-    @CurrentUser() currentUser: JwtPayload,
-    @Param('classId', new ParseUUIDPipe()) classId: string,
-  ): Promise<GroupListResponseDto> {
-    return this.groupService.getGroupsByClass(currentUser, classId);
-  }
-
-  @Get('teacher/:groupId')
-  @Roles(UserRole.TEACHER)
-  @ApiOperation({ summary: '교강사용 모둠 조회' })
-  @ApiOkResponse({
-    description: '교강사용 모둠 정보와 실명 멤버 목록을 반환합니다.',
-    type: GetTeacherGroupDetailSuccessResponseDto,
-  })
-  @ApiErrorResponses([401, 403, 404, 500])
-  async getTeacherGroupDetail(
+  async getGroupDetail(
     @CurrentUser() currentUser: JwtPayload,
     @Param('groupId', new ParseUUIDPipe()) groupId: string,
   ): Promise<GroupDetailResponseDto> {
-    return this.groupService.getTeacherGroupDetail(currentUser, groupId);
-  }
-
-  @Get('student/:groupId')
-  @Roles(UserRole.STUDENT)
-  @ApiOperation({ summary: '학생용 모둠 조회' })
-  @ApiOkResponse({
-    description: '학생용 모둠 정보와 익명 닉네임 멤버 목록을 반환합니다.',
-    type: GetStudentGroupDetailSuccessResponseDto,
-  })
-  @ApiErrorResponses([401, 403, 404, 500])
-  async getStudentGroupDetail(
-    @CurrentUser() currentUser: JwtPayload,
-    @Param('groupId', new ParseUUIDPipe()) groupId: string,
-  ): Promise<GroupDetailResponseDto> {
-    return this.groupService.getStudentGroupDetail(currentUser, groupId);
+    return this.groupService.getGroupDetail(currentUser, groupId);
   }
 }

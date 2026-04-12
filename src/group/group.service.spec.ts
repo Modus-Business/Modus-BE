@@ -200,7 +200,7 @@ describe('GroupService', () => {
       ],
     } as unknown as Group);
 
-    const result = await groupService.getStudentGroupDetail(
+    const result = await groupService.getGroupDetail(
       {
         sub: 'student-1',
         email: 'student@example.com',

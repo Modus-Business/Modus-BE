@@ -3,40 +3,6 @@ import {
   GroupDetailResponseDto,
   GroupDetailMemberDto,
 } from './group-detail.response.dto';
-import {
-  GroupListResponseDto,
-  GroupSummaryDto,
-} from './group-list.response.dto';
-
-export class GetGroupsByClassSuccessResponseDto {
-  @ApiProperty({ example: true })
-  success!: boolean;
-
-  @ApiProperty({ example: 200 })
-  statusCode!: number;
-
-  @ApiProperty({
-    type: GroupListResponseDto,
-    example: {
-      groups: [
-        {
-          groupId: 'group-1',
-          classId: 'class-1',
-          name: 'Group 3',
-          memberCount: 4,
-          createdAt: '2026-04-10T12:00:00.000Z',
-        },
-      ],
-    },
-  })
-  data!: GroupListResponseDto;
-
-  @ApiProperty({ example: '2026-04-11T12:00:00.000Z' })
-  timestamp!: string;
-
-  @ApiProperty({ example: '/groups/class/class-1' })
-  path!: string;
-}
 
 export class GetGroupDetailSuccessResponseDto {
   @ApiProperty({ example: true })
@@ -70,23 +36,8 @@ export class GetGroupDetailSuccessResponseDto {
   path!: string;
 }
 
-export class GetTeacherGroupDetailSuccessResponseDto extends GetGroupDetailSuccessResponseDto {
-  @ApiProperty({ example: '/groups/teacher/group-1' })
-  declare path: string;
-}
-
-export class GetStudentGroupDetailSuccessResponseDto extends GetGroupDetailSuccessResponseDto {
-  @ApiProperty({ example: '/groups/student/group-1' })
-  declare path: string;
-}
-
 export const GroupGetExtraModels = [
-  GroupSummaryDto,
-  GroupListResponseDto,
   GroupDetailMemberDto,
   GroupDetailResponseDto,
-  GetGroupsByClassSuccessResponseDto,
   GetGroupDetailSuccessResponseDto,
-  GetTeacherGroupDetailSuccessResponseDto,
-  GetStudentGroupDetailSuccessResponseDto,
 ] as const;

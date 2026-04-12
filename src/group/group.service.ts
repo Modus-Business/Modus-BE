@@ -15,7 +15,6 @@ import { CreateGroupRequestDto } from './dto/create-group.request.dto';
 import { CreateGroupResponseDto } from './dto/create-group.response.dto';
 import { DeleteGroupResponseDto } from './dto/delete-group.response.dto';
 import { GroupDetailResponseDto } from './dto/group-detail.response.dto';
-import { GroupListResponseDto } from './dto/group-list.response.dto';
 import { UpdateGroupRequestDto } from './dto/update-group.request.dto';
 import { GroupMember } from './entities/group-member.entity';
 import { GroupNickname } from './entities/group-nickname.entity';
@@ -25,18 +24,18 @@ const GROUP_NICKNAME_ADJECTIVES = [
   '빠른',
   '조용한',
   '반짝이는',
-  '느긋한',
+  '상냥한',
   '부드러운',
-  '따뜻한',
-  '기민한',
   '영리한',
+  '기민한',
+  '성실한',
   '차분한',
   '맑은',
 ];
 
 const GROUP_NICKNAME_NOUNS = [
   '파도',
-  '해변',
+  '나무',
   '호수',
   '별빛',
   '유성',
@@ -44,7 +43,7 @@ const GROUP_NICKNAME_NOUNS = [
   '고래',
   '구름',
   '온도',
-  '노을',
+  '이슬',
 ];
 
 @Injectable()
@@ -67,7 +66,7 @@ export class GroupService {
     request: CreateGroupRequestDto,
   ): Promise<CreateGroupResponseDto> {
     if (currentUser.role !== UserRole.TEACHER) {
-      throw new ForbiddenException('교사만 모둠을 생성할 수 있습니다.');
+      throw new ForbiddenException('교강사만 모둠을 생성할 수 있습니다.');
     }
 
     const classroom = await this.classroomRepository.findOne({
@@ -200,90 +199,38 @@ export class GroupService {
     await this.groupRepository.remove(group);
 
     return {
-      message: '모둠이 삭제되었습니다.',
+      message: '모둠을 삭제했습니다.',
     };
   }
 
-  async getGroupsByClass(
-    currentUser: JwtPayload,
-    classId: string,
-  ): Promise<GroupListResponseDto> {
-    if (currentUser.role !== UserRole.TEACHER) {
-      throw new ForbiddenException('교사만 모둠 목록을 조회할 수 있습니다.');
-    }
-
-    const classroom = await this.classroomRepository.findOne({
-      where: {
-        classId,
-      },
-    });
-
-    if (!classroom) {
-      throw new NotFoundException('해당 수업을 찾을 수 없습니다.');
-    }
-
-    if (classroom.teacherId !== currentUser.sub) {
-      throw new ForbiddenException('본인 수업의 모둠만 조회할 수 있습니다.');
-    }
-
-    const groups = await this.groupRepository.find({
-      where: {
-        classId,
-      },
-      relations: {
-        groupMembers: true,
-      },
-      order: {
-        createdAt: 'ASC',
-      },
-    });
-
-    return {
-      groups: groups.map((savedGroup) => ({
-        groupId: savedGroup.groupId,
-        classId: savedGroup.classId,
-        name: savedGroup.name,
-        memberCount: savedGroup.groupMembers.length,
-        createdAt: savedGroup.createdAt,
-      })),
-    };
-  }
-
-  async getTeacherGroupDetail(
+  async getGroupDetail(
     currentUser: JwtPayload,
     groupId: string,
   ): Promise<GroupDetailResponseDto> {
     const group = await this.getGroupWithMembers(groupId);
 
-    if (currentUser.role !== UserRole.TEACHER) {
-      throw new ForbiddenException('교강사만 모둠을 조회할 수 있습니다.');
+    if (currentUser.role === UserRole.TEACHER) {
+      if (group.classroom.teacherId !== currentUser.sub) {
+        throw new ForbiddenException(
+          '본인 수업의 모둠만 상세 조회할 수 있습니다.',
+        );
+      }
+
+      return {
+        groupId: group.groupId,
+        classId: group.classId,
+        name: group.name,
+        memberCount: group.groupMembers.length,
+        members: group.groupMembers.map((groupMember) => ({
+          groupMemberId: groupMember.groupMemberId,
+          displayName: groupMember.classParticipant.student.name,
+          isMe: false,
+        })),
+      };
     }
-
-    if (group.classroom.teacherId !== currentUser.sub) {
-      throw new ForbiddenException('본인 수업의 모둠만 상세 조회할 수 있습니다.');
-    }
-
-    return {
-      groupId: group.groupId,
-      classId: group.classId,
-      name: group.name,
-      memberCount: group.groupMembers.length,
-      members: group.groupMembers.map((groupMember) => ({
-        groupMemberId: groupMember.groupMemberId,
-        displayName: groupMember.classParticipant.student.name,
-        isMe: false,
-      })),
-    };
-  }
-
-  async getStudentGroupDetail(
-    currentUser: JwtPayload,
-    groupId: string,
-  ): Promise<GroupDetailResponseDto> {
-    const group = await this.getGroupWithMembers(groupId);
 
     if (currentUser.role !== UserRole.STUDENT) {
-      throw new ForbiddenException('학생만 모둠을 조회할 수 있습니다.');
+      throw new ForbiddenException('학생 또는 교강사만 모둠을 조회할 수 있습니다.');
     }
 
     const isMember = group.groupMembers.some(
@@ -333,6 +280,7 @@ export class GroupService {
     if (!group) {
       throw new NotFoundException('해당 모둠을 찾을 수 없습니다.');
     }
+
     return group;
   }
 
@@ -426,7 +374,7 @@ export class GroupService {
     groupId: string,
   ): Promise<Group> {
     if (currentUser.role !== UserRole.TEACHER) {
-      throw new ForbiddenException('교사만 모둠을 관리할 수 있습니다.');
+      throw new ForbiddenException('교강사만 모둠을 관리할 수 있습니다.');
     }
 
     const group = await this.groupRepository.findOne({
