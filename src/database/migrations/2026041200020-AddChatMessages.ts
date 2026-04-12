@@ -8,11 +8,13 @@ export class AddChatMessages2026041200020 implements MigrationInterface {
       CREATE TABLE "chat_messages" (
         "message_id" uuid NOT NULL DEFAULT gen_random_uuid(),
         "group_id" uuid NOT NULL,
+        "sender_user_id" uuid NOT NULL,
         "nickname" character varying(50) NOT NULL,
         "content" character varying(2000) NOT NULL,
         "sent_at" TIMESTAMP NOT NULL DEFAULT now(),
         CONSTRAINT "PK_chat_messages_message_id" PRIMARY KEY ("message_id"),
-        CONSTRAINT "FK_chat_messages_group_id_groups_groupId" FOREIGN KEY ("group_id") REFERENCES "groups"("groupId") ON DELETE CASCADE ON UPDATE NO ACTION
+        CONSTRAINT "FK_chat_messages_group_id_groups_groupId" FOREIGN KEY ("group_id") REFERENCES "groups"("groupId") ON DELETE CASCADE ON UPDATE NO ACTION,
+        CONSTRAINT "FK_chat_messages_sender_user_id_users_userId" FOREIGN KEY ("sender_user_id") REFERENCES "users"("userId") ON DELETE CASCADE ON UPDATE NO ACTION
       )
     `);
     await queryRunner.query(`

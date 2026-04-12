@@ -8,8 +8,9 @@
 - 사용자는 먼저 `chat.join` 이벤트로 그룹 채팅방에 입장해야 합니다.
 - `chat.send`는 `chat.join` 이후에만 허용됩니다.
 - 채팅방 식별자는 별도 `roomId`가 아니라 기존 `groupId`를 그대로 사용합니다.
-- 닉네임은 클라이언트가 보내지 않고 서버가 그룹 정보로 결정합니다.
+- 닉네임은 클라이언트가 보내지 않고 서버가 JWT와 그룹 정보로 결정합니다.
 - 최근 메시지 50개를 입장 직후 `chat.history`로 내려줍니다.
+- WebSocket CORS는 `CORS_ORIGIN`에 포함된 origin만 허용합니다.
 
 ## 연결
 
@@ -75,12 +76,32 @@ ws://<host>/chat
 }
 ```
 
+### `chat.error`
+
+`chat.join`, `chat.send` 처리 중 발생한 오류는 `chat.error` 이벤트로 전달됩니다.
+
+```json
+{
+  "success": false,
+  "statusCode": 400,
+  "message": "error message",
+  "error": "Bad Request",
+  "timestamp": "2026-04-12T12:01:00.000Z",
+  "event": "chat.send"
+}
+```
+
+### `connect_error`
+
+연결 단계의 인증 실패 또는 CORS 거부는 Socket.IO `connect_error`로 전달됩니다.
+
 ## 저장 구조
 
 `chat_messages`
 
 - `message_id`
 - `group_id`
+- `sender_user_id`
 - `nickname`
 - `content`
 - `sent_at`

@@ -29,6 +29,7 @@ export class ChatService {
 
   async createMessage(
     groupId: string,
+    senderUserId: string,
     nickname: string,
     content: string,
   ): Promise<ChatMessageResponseDto> {
@@ -40,6 +41,7 @@ export class ChatService {
 
     const message = this.chatMessageRepository.create({
       groupId,
+      senderUserId,
       nickname: nickname.trim(),
       content: trimmedContent,
     });

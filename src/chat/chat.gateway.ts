@@ -1,6 +1,7 @@
 import {
   ConnectedSocket,
   MessageBody,
+  OnGatewayInit,
   OnGatewayConnection,
   OnGatewayDisconnect,
   SubscribeMessage,
@@ -15,6 +16,7 @@ import {
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Server, Socket } from 'socket.io';
 import { WsExceptionFilter } from '../common/filters/ws-exception.filter';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
@@ -39,7 +41,7 @@ const MESSAGE_RATE_LIMIT_COUNT = 5;
 @WebSocketGateway({
   namespace: '/chat',
   cors: {
-    origin: true,
+    origin: [],
     credentials: true,
   },
 })
@@ -51,7 +53,9 @@ const MESSAGE_RATE_LIMIT_COUNT = 5;
   }),
 )
 @UseFilters(new WsExceptionFilter())
-export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class ChatGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server!: Server;
 
@@ -61,18 +65,35 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly chatService: ChatService,
     private readonly tokenService: TokenService,
     private readonly groupService: GroupService,
+    private readonly configService: ConfigService,
   ) {}
 
-  handleConnection(client: ChatSocket): void {
-    try {
-      client.data.currentUser = this.authenticateClient(client);
-    } catch (error) {
-      this.emitConnectionError(client, error);
-      client.disconnect();
-      return;
-    }
+  afterInit(server: Server): void {
+    const allowedOrigins = this.getAllowedOrigins();
 
-    client.data.recentMessageTimestamps = [];
+    server.engine.opts.cors = {
+      origin: allowedOrigins,
+      credentials: true,
+    };
+    server.use((socket, next) => {
+      const origin = socket.handshake.headers.origin;
+
+      if (origin && !allowedOrigins.includes(origin)) {
+        next(new Error('허용되지 않은 origin입니다.'));
+        return;
+      }
+
+      try {
+        socket.data.currentUser = this.authenticateClient(socket as ChatSocket);
+        socket.data.recentMessageTimestamps = [];
+        next();
+      } catch (error) {
+        next(error instanceof Error ? error : new Error('인증에 실패했습니다.'));
+      }
+    });
+  }
+
+  handleConnection(client: ChatSocket): void {
     this.logger.debug(`chat client connected: ${client.id}`);
   }
 
@@ -141,6 +162,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const message = await this.chatService.createMessage(
       participant.groupId,
+      currentUser.sub,
       participant.nickname,
       payload.content,
     );
@@ -169,32 +191,17 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return this.tokenService.verifyAccessToken(accessToken);
   }
 
-  private emitConnectionError(client: ChatSocket, exception: unknown): void {
-    const statusCode =
-      exception instanceof UnauthorizedException ? exception.getStatus() : 500;
-    const exceptionResponse =
-      exception instanceof UnauthorizedException ? exception.getResponse() : null;
-    const message =
-      typeof exceptionResponse === 'object' &&
-      exceptionResponse &&
-      'message' in exceptionResponse
-        ? (exceptionResponse as { message: string | string[] }).message
-        : '웹소켓 연결 중 오류가 발생했습니다.';
-    const error =
-      typeof exceptionResponse === 'object' &&
-      exceptionResponse &&
-      'error' in exceptionResponse
-        ? String((exceptionResponse as { error?: unknown }).error)
-        : 'Unauthorized';
+  private getAllowedOrigins(): string[] {
+    const configuredOrigins = this.configService.get<string>('CORS_ORIGIN');
 
-    client.emit('chat.error', {
-      success: false,
-      statusCode,
-      message,
-      error,
-      timestamp: new Date().toISOString(),
-      event: 'connection',
-    });
+    if (!configuredOrigins) {
+      return [];
+    }
+
+    return configuredOrigins
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter((origin) => origin.length > 0);
   }
 
   private enforceRateLimit(client: ChatSocket): void {

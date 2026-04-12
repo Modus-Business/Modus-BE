@@ -9,6 +9,9 @@ export class ChatMessage {
   @Column({ type: 'uuid', name: 'group_id' })
   groupId!: string;
 
+  @Column({ type: 'uuid', name: 'sender_user_id' })
+  senderUserId!: string;
+
   @Column({ type: 'varchar', length: 50 })
   nickname!: string;
 
