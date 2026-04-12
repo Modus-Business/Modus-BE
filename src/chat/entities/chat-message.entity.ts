@@ -9,8 +9,8 @@ export class ChatMessage {
   @Column({ type: 'uuid', name: 'group_id' })
   groupId!: string;
 
-  @Column({ type: 'uuid', name: 'sender_user_id' })
-  senderUserId!: string;
+  @Column({ type: 'uuid', name: 'sender_user_id', nullable: true })
+  senderUserId!: string | null;
 
   @Column({ type: 'varchar', length: 50 })
   nickname!: string;

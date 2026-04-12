@@ -2,6 +2,7 @@ import { ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { User } from '../auth/signup/entities/user.entity';
 import { UserRole } from '../auth/signup/enums/user-role.enum';
 import { ClassParticipant } from '../class/entities/class-participant.entity';
 import { Classroom } from '../class/entities/class.entity';
@@ -15,6 +16,7 @@ describe('GroupService', () => {
   let groupService: GroupService;
   let classroomRepository: jest.Mocked<Repository<Classroom>>;
   let classParticipantRepository: jest.Mocked<Repository<ClassParticipant>>;
+  let userRepository: jest.Mocked<Repository<User>>;
   let groupRepository: jest.Mocked<Repository<Group>>;
   let groupMemberRepository: jest.Mocked<Repository<GroupMember>>;
   let groupNicknameRepository: jest.Mocked<Repository<GroupNickname>>;
@@ -33,6 +35,12 @@ describe('GroupService', () => {
           provide: getRepositoryToken(ClassParticipant),
           useValue: {
             find: jest.fn(),
+          },
+        },
+        {
+          provide: getRepositoryToken(User),
+          useValue: {
+            findOne: jest.fn(),
           },
         },
         {
@@ -69,6 +77,7 @@ describe('GroupService', () => {
     groupService = module.get<GroupService>(GroupService);
     classroomRepository = module.get(getRepositoryToken(Classroom));
     classParticipantRepository = module.get(getRepositoryToken(ClassParticipant));
+    userRepository = module.get(getRepositoryToken(User));
     groupRepository = module.get(getRepositoryToken(Group));
     groupMemberRepository = module.get(getRepositoryToken(GroupMember));
     groupNicknameRepository = module.get(getRepositoryToken(GroupNickname));
@@ -250,5 +259,72 @@ describe('GroupService', () => {
         },
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('returns the teacher and current members as chat audience user ids', async () => {
+    groupRepository.findOne.mockResolvedValue({
+      groupId: 'group-1',
+      classId: 'class-1',
+      name: '모둠 1',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      classroom: {
+        classId: 'class-1',
+        teacherId: 'teacher-1',
+      },
+      groupMembers: [
+        {
+          groupMemberId: 'group-member-1',
+          classParticipant: {
+            classParticipantId: 'participant-1',
+            studentId: 'student-1',
+          },
+        },
+        {
+          groupMemberId: 'group-member-2',
+          classParticipant: {
+            classParticipantId: 'participant-2',
+            studentId: 'student-2',
+          },
+        },
+      ],
+    } as unknown as Group);
+
+    await expect(groupService.getChatAudienceUserIds('group-1')).resolves.toEqual(
+      ['teacher-1', 'student-1', 'student-2'],
+    );
+  });
+
+  it('returns the teacher name as the chat nickname for teachers', async () => {
+    groupRepository.findOne.mockResolvedValue({
+      groupId: 'group-1',
+      classId: 'class-1',
+      name: '모둠 1',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      classroom: {
+        classId: 'class-1',
+        teacherId: 'teacher-1',
+      },
+      groupMembers: [],
+    } as unknown as Group);
+    userRepository.findOne.mockResolvedValue({
+      userId: 'teacher-1',
+      name: '김교사',
+    } as User);
+
+    await expect(
+      groupService.getChatParticipantInfo(
+        {
+          sub: 'teacher-1',
+          email: 'teacher@example.com',
+          role: UserRole.TEACHER,
+        },
+        'group-1',
+      ),
+    ).resolves.toEqual({
+      groupId: 'group-1',
+      nickname: '김교사',
+    });
   });
 });
