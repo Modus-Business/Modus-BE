@@ -1,7 +1,4 @@
-import {
-  ConflictException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -139,7 +136,7 @@ describe('GroupService', () => {
     expect(groupNicknameRepository.create).toHaveBeenCalledTimes(2);
   });
 
-  it('throws conflict when a student is already assigned to another group', async () => {
+  it('moves a student from another group when creating a new group', async () => {
     classroomRepository.findOne.mockResolvedValue({
       classId: 'class-1',
       teacherId: 'teacher-1',
@@ -158,21 +155,44 @@ describe('GroupService', () => {
         classParticipantId: 'participant-1',
       },
     ] as GroupMember[]);
+    groupRepository.create.mockImplementation((input) => input as Group);
+    groupRepository.save.mockResolvedValue({
+      groupId: 'group-2',
+      classId: 'class-1',
+      name: '모둠 1',
+      createdAt: new Date('2026-04-10T12:00:00.000Z'),
+      updatedAt: new Date('2026-04-10T12:00:00.000Z'),
+    } as Group);
+    groupMemberRepository.create.mockImplementation(
+      (input) => input as GroupMember,
+    );
+    groupMemberRepository.save.mockResolvedValue([] as unknown as never);
+    groupNicknameRepository.find.mockResolvedValue([
+      {
+        classParticipantId: 'participant-1',
+        nickname: '빠른 파도',
+      },
+    ] as GroupNickname[]);
 
-    await expect(
-      groupService.createGroup(
-        {
-          sub: 'teacher-1',
-          email: 'teacher@example.com',
-          role: UserRole.TEACHER,
-        },
-        {
-          classId: 'class-1',
-          name: '모둠 1',
-          studentIds: ['student-1'],
-        },
-      ),
-    ).rejects.toBeInstanceOf(ConflictException);
+    const result = await groupService.createGroup(
+      {
+        sub: 'teacher-1',
+        email: 'teacher@example.com',
+        role: UserRole.TEACHER,
+      },
+      {
+        classId: 'class-1',
+        name: '모둠 1',
+        studentIds: ['student-1'],
+      },
+    );
+
+    expect(result.groupId).toBe('group-2');
+    expect(groupMemberRepository.remove).toHaveBeenCalledWith([
+      expect.objectContaining({
+        groupMemberId: 'group-member-1',
+      }),
+    ]);
   });
 
   it('returns class-scoped nicknames to student members in group detail', async () => {

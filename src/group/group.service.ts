@@ -1,5 +1,4 @@
 import {
-  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -88,15 +87,17 @@ export class GroupService {
       request.classId,
       studentIds,
     );
-    await this.ensureParticipantsAreAssignable(
-      participants.map((classParticipant) => classParticipant.classParticipantId),
-    );
 
     const group = this.groupRepository.create({
       classId: request.classId,
       name: request.name.trim(),
     });
     const savedGroup = await this.groupRepository.save(group);
+
+    await this.releaseParticipantsFromOtherGroups(
+      participants.map((classParticipant) => classParticipant.classParticipantId),
+      savedGroup.groupId,
+    );
 
     if (participants.length > 0) {
       await this.addParticipantsToGroup(
@@ -149,7 +150,7 @@ export class GroupService {
       )
       .map((classParticipant) => classParticipant.classParticipantId);
 
-    await this.ensureParticipantsAreAssignable(participantIdsToAdd);
+    await this.releaseParticipantsFromOtherGroups(participantIdsToAdd, groupId);
 
     const membersToRemove = currentMembers.filter(
       (groupMember) =>
@@ -421,8 +422,9 @@ export class GroupService {
     return participants;
   }
 
-  private async ensureParticipantsAreAssignable(
+  private async releaseParticipantsFromOtherGroups(
     classParticipantIds: string[],
+    targetGroupId: string | null,
   ): Promise<void> {
     if (classParticipantIds.length === 0) {
       return;
@@ -434,10 +436,12 @@ export class GroupService {
       },
     });
 
-    if (existingGroupMembers.length > 0) {
-      throw new ConflictException(
-        '이미 다른 모둠에 배정된 학생이 포함되어 있습니다.',
-      );
+    const membersToMove = existingGroupMembers.filter(
+      (groupMember) => groupMember.groupId !== targetGroupId,
+    );
+
+    if (membersToMove.length > 0) {
+      await this.groupMemberRepository.remove(membersToMove);
     }
   }
 }
