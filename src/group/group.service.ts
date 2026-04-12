@@ -257,6 +257,45 @@ export class GroupService {
     };
   }
 
+  async getChatParticipantInfo(
+    currentUser: JwtPayload,
+    groupId: string,
+  ): Promise<{ groupId: string; nickname: string }> {
+    const group = await this.getGroupWithMembers(groupId);
+
+    if (currentUser.role === UserRole.TEACHER) {
+      if (group.classroom.teacherId !== currentUser.sub) {
+        throw new ForbiddenException(
+          '본인 수업의 그룹 채팅에만 입장할 수 있습니다.',
+        );
+      }
+
+      return {
+        groupId: group.groupId,
+        nickname: '교사',
+      };
+    }
+
+    if (currentUser.role !== UserRole.STUDENT) {
+      throw new ForbiddenException('학생 또는 교사만 그룹 채팅에 입장할 수 있습니다.');
+    }
+
+    const myGroupMember = group.groupMembers.find(
+      (groupMember) => groupMember.classParticipant.studentId === currentUser.sub,
+    );
+
+    if (!myGroupMember) {
+      throw new ForbiddenException('본인이 속한 그룹 채팅에만 입장할 수 있습니다.');
+    }
+
+    return {
+      groupId: group.groupId,
+      nickname:
+        myGroupMember.classParticipant.groupNickname?.nickname ??
+        myGroupMember.classParticipant.student.name,
+    };
+  }
+
   private async getGroupWithMembers(groupId: string): Promise<Group> {
     const group = await this.groupRepository.findOne({
       where: {

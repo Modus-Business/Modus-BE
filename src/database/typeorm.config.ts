@@ -5,6 +5,7 @@ import { RefreshToken } from '../auth/login/refresh-token/entities/refresh-token
 import { SignupVerification } from '../auth/signup/entities/signup-verification.entity';
 import { User } from '../auth/signup/entities/user.entity';
 import { AssignmentSubmission } from '../assignment/entities/assignment-submission.entity';
+import { ChatMessage } from '../chat/entities/chat-message.entity';
 import { ClassParticipant } from '../class/entities/class-participant.entity';
 import { Classroom } from '../class/entities/class.entity';
 import { Group } from '../group/entities/group.entity';
@@ -17,6 +18,7 @@ const databaseEntities = [
   User,
   SignupVerification,
   RefreshToken,
+  ChatMessage,
   Classroom,
   ClassParticipant,
   Group,

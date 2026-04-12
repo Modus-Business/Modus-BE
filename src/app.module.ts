@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
+import { ChatModule } from './chat/chat.module';
 import { ClassModule } from './class/class.module';
 import { GroupModule } from './group/group.module';
 import { MeModule } from './me/me.module';
@@ -22,6 +23,7 @@ import { createTypeOrmOptions } from './database/typeorm.config';
       useFactory: () => createTypeOrmOptions(process.env),
     }),
     AuthModule,
+    ChatModule,
     ClassModule,
     GroupModule,
     NoticeModule,

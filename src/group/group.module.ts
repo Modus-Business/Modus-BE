@@ -22,5 +22,6 @@ import { GroupNickname } from './entities/group-nickname.entity';
   ],
   controllers: [GroupController],
   providers: [GroupService],
+  exports: [GroupService],
 })
 export class GroupModule {}
