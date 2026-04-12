@@ -17,7 +17,7 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Server, Socket } from 'socket.io';
+import { Namespace, Server, Socket } from 'socket.io';
 import { WsExceptionFilter } from '../common/filters/ws-exception.filter';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { TokenService } from '../auth/login/token/token.service';
@@ -69,13 +69,18 @@ export class ChatGateway
     private readonly configService: ConfigService,
   ) {}
 
-  afterInit(server: Server): void {
+  afterInit(server: Server | Namespace): void {
     const allowedOrigins = this.getAllowedOrigins();
+    const rootServer =
+      ('server' in server && server.server ? server.server : server) as Server;
 
-    server.engine.opts.cors = {
-      origin: allowedOrigins,
-      credentials: true,
-    };
+    if (rootServer.engine?.opts) {
+      rootServer.engine.opts.cors = {
+        origin: allowedOrigins,
+        credentials: true,
+      };
+    }
+
     server.use((socket, next) => {
       const origin = socket.handshake.headers.origin;
 
