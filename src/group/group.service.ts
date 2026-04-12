@@ -7,6 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { randomInt } from 'node:crypto';
 import { In, Repository } from 'typeorm';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { User } from '../auth/signup/entities/user.entity';
 import { UserRole } from '../auth/signup/enums/user-role.enum';
 import { ClassParticipant } from '../class/entities/class-participant.entity';
 import { Classroom } from '../class/entities/class.entity';
@@ -52,6 +53,8 @@ export class GroupService {
     private readonly classroomRepository: Repository<Classroom>,
     @InjectRepository(ClassParticipant)
     private readonly classParticipantRepository: Repository<ClassParticipant>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     @InjectRepository(Group)
     private readonly groupRepository: Repository<Group>,
     @InjectRepository(GroupMember)
@@ -270,9 +273,19 @@ export class GroupService {
         );
       }
 
+      const teacher = await this.userRepository.findOne({
+        where: {
+          userId: currentUser.sub,
+        },
+      });
+
+      if (!teacher) {
+        throw new NotFoundException('교사 정보를 찾을 수 없습니다.');
+      }
+
       return {
         groupId: group.groupId,
-        nickname: '교사',
+        nickname: teacher.name,
       };
     }
 

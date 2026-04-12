@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
+import { User } from '../auth/signup/entities/user.entity';
 import { ClassParticipant } from '../class/entities/class-participant.entity';
 import { Classroom } from '../class/entities/class.entity';
 import { GroupController } from './group.controller';
@@ -15,6 +16,7 @@ import { GroupNickname } from './entities/group-nickname.entity';
     TypeOrmModule.forFeature([
       Classroom,
       ClassParticipant,
+      User,
       Group,
       GroupMember,
       GroupNickname,

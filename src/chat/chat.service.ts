@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ChatMessageResponseDto } from './dto/chat-message.response.dto';
@@ -32,10 +32,16 @@ export class ChatService {
     nickname: string,
     content: string,
   ): Promise<ChatMessageResponseDto> {
+    const trimmedContent = content.trim();
+
+    if (!trimmedContent) {
+      throw new BadRequestException('content는 공백만 보낼 수 없습니다.');
+    }
+
     const message = this.chatMessageRepository.create({
       groupId,
       nickname: nickname.trim(),
-      content: content.trim(),
+      content: trimmedContent,
     });
     const savedMessage = await this.chatMessageRepository.save(message);
 
