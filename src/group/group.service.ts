@@ -249,10 +249,67 @@ export class GroupService {
     };
   }
 
-  async getGroupDetail(
+  async getTeacherGroupDetail(
     currentUser: JwtPayload,
     groupId: string,
   ): Promise<GroupDetailResponseDto> {
+    const group = await this.getGroupWithMembers(groupId);
+
+    if (currentUser.role !== UserRole.TEACHER) {
+      throw new ForbiddenException('교강사만 모둠을 조회할 수 있습니다.');
+    }
+
+    if (group.classroom.teacherId !== currentUser.sub) {
+      throw new ForbiddenException('본인 수업의 모둠만 상세 조회할 수 있습니다.');
+    }
+
+    return {
+      groupId: group.groupId,
+      classId: group.classId,
+      name: group.name,
+      memberCount: group.groupMembers.length,
+      members: group.groupMembers.map((groupMember) => ({
+        groupMemberId: groupMember.groupMemberId,
+        displayName: groupMember.classParticipant.student.name,
+        isMe: false,
+      })),
+    };
+  }
+
+  async getStudentGroupDetail(
+    currentUser: JwtPayload,
+    groupId: string,
+  ): Promise<GroupDetailResponseDto> {
+    const group = await this.getGroupWithMembers(groupId);
+
+    if (currentUser.role !== UserRole.STUDENT) {
+      throw new ForbiddenException('학생만 모둠을 조회할 수 있습니다.');
+    }
+
+    const isMember = group.groupMembers.some(
+      (groupMember) => groupMember.classParticipant.studentId === currentUser.sub,
+    );
+
+    if (!isMember) {
+      throw new ForbiddenException('본인이 속한 모둠만 상세 조회할 수 있습니다.');
+    }
+
+    return {
+      groupId: group.groupId,
+      classId: group.classId,
+      name: group.name,
+      memberCount: group.groupMembers.length,
+      members: group.groupMembers.map((groupMember) => ({
+        groupMemberId: groupMember.groupMemberId,
+        displayName:
+          groupMember.classParticipant.groupNickname?.nickname ??
+          '이름 없는 모둠원',
+        isMe: groupMember.classParticipant.studentId === currentUser.sub,
+      })),
+    };
+  }
+
+  private async getGroupWithMembers(groupId: string): Promise<Group> {
     const group = await this.groupRepository.findOne({
       where: {
         groupId,
@@ -276,51 +333,7 @@ export class GroupService {
     if (!group) {
       throw new NotFoundException('해당 모둠을 찾을 수 없습니다.');
     }
-
-    if (currentUser.role === UserRole.TEACHER) {
-      if (group.classroom.teacherId !== currentUser.sub) {
-        throw new ForbiddenException('본인 수업의 모둠만 상세 조회할 수 있습니다.');
-      }
-
-      return {
-        groupId: group.groupId,
-        classId: group.classId,
-        name: group.name,
-        memberCount: group.groupMembers.length,
-        members: group.groupMembers.map((groupMember) => ({
-          groupMemberId: groupMember.groupMemberId,
-          displayName: groupMember.classParticipant.student.name,
-          isMe: false,
-        })),
-      };
-    }
-
-    if (currentUser.role === UserRole.STUDENT) {
-      const isMember = group.groupMembers.some(
-        (groupMember) =>
-          groupMember.classParticipant.studentId === currentUser.sub,
-      );
-
-      if (!isMember) {
-        throw new ForbiddenException('본인이 속한 모둠만 상세 조회할 수 있습니다.');
-      }
-
-      return {
-        groupId: group.groupId,
-        classId: group.classId,
-        name: group.name,
-        memberCount: group.groupMembers.length,
-        members: group.groupMembers.map((groupMember) => ({
-          groupMemberId: groupMember.groupMemberId,
-          displayName:
-            groupMember.classParticipant.groupNickname?.nickname ??
-            '이름 없는 모둠원',
-          isMe: groupMember.classParticipant.studentId === currentUser.sub,
-        })),
-      };
-    }
-
-    throw new ForbiddenException('지원하지 않는 사용자 역할입니다.');
+    return group;
   }
 
   private async addParticipantsToGroup(

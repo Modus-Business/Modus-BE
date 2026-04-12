@@ -89,9 +89,14 @@
 ### `GET /groups/class/:classId`
 - 교사용 모둠 목록 조회 API입니다.
 
-### `GET /groups/:groupId`
-- 모둠 상세 조회 API입니다.
-- 학생은 `GET /classes`에서 받은 `myGroup.groupId`로 자신의 모둠 상세를 조회합니다.
+### `GET /groups/teacher/:groupId`
+- 교강사용 모둠 조회 API입니다.
+- 실명 기준 멤버 목록을 반환합니다.
+
+### `GET /groups/student/:groupId`
+- 학생용 모둠 조회 API입니다.
+- 익명 닉네임 기준 멤버 목록을 반환합니다.
+- 학생은 `GET /classes`에서 받은 `myGroup.groupId`로 자신의 모둠을 조회합니다.
 
 ## Notices
 

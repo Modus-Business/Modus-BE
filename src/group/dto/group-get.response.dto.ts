@@ -70,6 +70,16 @@ export class GetGroupDetailSuccessResponseDto {
   path!: string;
 }
 
+export class GetTeacherGroupDetailSuccessResponseDto extends GetGroupDetailSuccessResponseDto {
+  @ApiProperty({ example: '/groups/teacher/group-1' })
+  declare path: string;
+}
+
+export class GetStudentGroupDetailSuccessResponseDto extends GetGroupDetailSuccessResponseDto {
+  @ApiProperty({ example: '/groups/student/group-1' })
+  declare path: string;
+}
+
 export const GroupGetExtraModels = [
   GroupSummaryDto,
   GroupListResponseDto,
@@ -77,4 +87,6 @@ export const GroupGetExtraModels = [
   GroupDetailResponseDto,
   GetGroupsByClassSuccessResponseDto,
   GetGroupDetailSuccessResponseDto,
+  GetTeacherGroupDetailSuccessResponseDto,
+  GetStudentGroupDetailSuccessResponseDto,
 ] as const;
