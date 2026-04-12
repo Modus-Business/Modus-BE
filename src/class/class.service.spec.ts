@@ -7,6 +7,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserRole } from '../auth/signup/enums/user-role.enum';
+import { Group } from '../group/entities/group.entity';
 import { ClassService } from './class.service';
 import { CreateClassRequestDto } from './dto/create-class.request.dto';
 import { JoinClassRequestDto } from './dto/join-class.request.dto';
@@ -381,5 +382,49 @@ describe('ClassService', () => {
         },
       ),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+  it('교강사는 수업별 모둠 목록을 조회할 수 있다', async () => {
+    classroomRepository.findOne.mockResolvedValue({
+      classId: 'class-1',
+      teacherId: 'teacher-1',
+      name: '프로젝트 스튜디오',
+      description: '메인 실습 수업',
+      classCode: 'AB12-CD34',
+      createdAt: new Date('2026-04-10T12:00:00.000Z'),
+      updatedAt: new Date(),
+      classParticipants: [],
+      groups: [
+        {
+          groupId: 'group-1',
+          classId: 'class-1',
+          name: '모둠 1',
+          createdAt: new Date('2026-04-10T12:00:00.000Z'),
+          updatedAt: new Date(),
+          classroom: undefined as never,
+          groupMembers: [{}, {}] as never,
+        } as Group,
+      ],
+    } as Classroom);
+
+    const result = await classService.getClassGroups(
+      {
+        sub: 'teacher-1',
+        email: 'teacher@example.com',
+        role: UserRole.TEACHER,
+      },
+      'class-1',
+    );
+
+    expect(result).toEqual({
+      groups: [
+        {
+          groupId: 'group-1',
+          classId: 'class-1',
+          name: '모둠 1',
+          memberCount: 2,
+          createdAt: new Date('2026-04-10T12:00:00.000Z'),
+        },
+      ],
+    });
   });
 });

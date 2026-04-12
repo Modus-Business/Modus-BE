@@ -9,6 +9,7 @@ import { randomInt } from 'node:crypto';
 import { Repository } from 'typeorm';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { UserRole } from '../auth/signup/enums/user-role.enum';
+import { GroupListResponseDto } from '../group/dto/group-list.response.dto';
 import { ClassParticipantsResponseDto } from './dto/class-participants.response.dto';
 import { ClassesResponseDto } from './dto/classes.response.dto';
 import { CreateClassRequestDto } from './dto/create-class.request.dto';
@@ -82,6 +83,49 @@ export class ClassService {
           : null,
         joinedAt: classParticipant.joinedAt,
         groupJoinedAt: classParticipant.groupMember?.joinedAt ?? null,
+      })),
+    };
+  }
+
+  async getClassGroups(
+    currentUser: JwtPayload,
+    classId: string,
+  ): Promise<GroupListResponseDto> {
+    const classroom = await this.classroomRepository.findOne({
+      where: {
+        classId,
+      },
+      relations: {
+        groups: {
+          groupMembers: true,
+        },
+      },
+      order: {
+        groups: {
+          createdAt: 'ASC',
+        },
+      },
+    });
+
+    if (!classroom) {
+      throw new NotFoundException('해당 수업을 찾을 수 없습니다.');
+    }
+
+    if (currentUser.role !== UserRole.TEACHER) {
+      throw new ForbiddenException('교강사만 수업 모둠 목록을 조회할 수 있습니다.');
+    }
+
+    if (classroom.teacherId !== currentUser.sub) {
+      throw new ForbiddenException('본인 수업의 모둠 목록만 조회할 수 있습니다.');
+    }
+
+    return {
+      groups: classroom.groups.map((group) => ({
+        groupId: group.groupId,
+        classId: group.classId,
+        name: group.name,
+        memberCount: group.groupMembers.length,
+        createdAt: group.createdAt,
       })),
     };
   }

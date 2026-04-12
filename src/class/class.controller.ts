@@ -23,6 +23,10 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { UserRole } from '../auth/signup/enums/user-role.enum';
 import { ApiErrorResponses } from '../common/decorators/api-error-responses.decorator';
+import {
+  GroupListResponseDto,
+  GroupSummaryDto,
+} from '../group/dto/group-list.response.dto';
 import { ClassService } from './class.service';
 import {
   ClassParticipantGroupDto,
@@ -37,6 +41,7 @@ import {
 import { CreateClassRequestDto } from './dto/create-class.request.dto';
 import { CreateClassResponseDto } from './dto/create-class.response.dto';
 import { GetClassParticipantsSuccessResponseDto } from './dto/get-class-participants.success.response.dto';
+import { GetClassGroupsSuccessResponseDto } from './dto/get-class-groups.success.response.dto';
 import { GetClassesSuccessResponseDto } from './dto/get-classes.success.response.dto';
 import { JoinClassRequestDto } from './dto/join-class.request.dto';
 import { JoinClassResponseDto } from './dto/join-class.response.dto';
@@ -52,6 +57,9 @@ import { RegenerateClassCodeResponseDto } from './dto/regenerate-class-code.resp
   ClassParticipantItemDto,
   ClassParticipantsResponseDto,
   GetClassParticipantsSuccessResponseDto,
+  GroupSummaryDto,
+  GroupListResponseDto,
+  GetClassGroupsSuccessResponseDto,
 )
 @ApiBearerAuth('access-token')
 @Controller('classes')
@@ -85,6 +93,21 @@ export class ClassController {
     @Param('classId', new ParseUUIDPipe()) classId: string,
   ): Promise<ClassParticipantsResponseDto> {
     return this.classService.getClassParticipants(currentUser, classId);
+  }
+
+  @Get(':classId/groups')
+  @Roles(UserRole.TEACHER)
+  @ApiOperation({ summary: '교강사 수업별 모둠 목록 조회' })
+  @ApiOkResponse({
+    description: '특정 수업에 속한 모든 모둠 목록을 반환합니다.',
+    type: GetClassGroupsSuccessResponseDto,
+  })
+  @ApiErrorResponses([401, 403, 404, 500])
+  async getClassGroups(
+    @CurrentUser() currentUser: JwtPayload,
+    @Param('classId', new ParseUUIDPipe()) classId: string,
+  ): Promise<GroupListResponseDto> {
+    return this.classService.getClassGroups(currentUser, classId);
   }
 
   @Post()
