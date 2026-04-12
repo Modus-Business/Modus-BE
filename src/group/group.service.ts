@@ -1,54 +1,34 @@
 import {
   ForbiddenException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { randomInt } from 'node:crypto';
-import { In, Repository } from 'typeorm';
+import { In, QueryFailedError, Repository } from 'typeorm';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { User } from '../auth/signup/entities/user.entity';
 import { UserRole } from '../auth/signup/enums/user-role.enum';
 import { ChatRoomService } from '../chat/chat-room.service';
 import { ClassParticipant } from '../class/entities/class-participant.entity';
 import { Classroom } from '../class/entities/class.entity';
+import { OpenAiService } from '../openai/openai.service';
+import { Survey } from '../survey/entities/survey.entity';
 import { CreateGroupRequestDto } from './dto/create-group.request.dto';
 import { CreateGroupResponseDto } from './dto/create-group.response.dto';
 import { DeleteGroupResponseDto } from './dto/delete-group.response.dto';
 import { GroupDetailResponseDto } from './dto/group-detail.response.dto';
+import { GroupNicknameResponseDto } from './dto/group-nickname.response.dto';
 import { UpdateGroupRequestDto } from './dto/update-group.request.dto';
 import { GroupMember } from './entities/group-member.entity';
 import { GroupNickname } from './entities/group-nickname.entity';
+import { NicknameReservation } from './entities/nickname-reservation.entity';
 import { Group } from './entities/group.entity';
-
-const GROUP_NICKNAME_ADJECTIVES = [
-  '빠른',
-  '조용한',
-  '반짝이는',
-  '상냥한',
-  '부드러운',
-  '영리한',
-  '기민한',
-  '성실한',
-  '차분한',
-  '맑은',
-];
-
-const GROUP_NICKNAME_NOUNS = [
-  '파도',
-  '나무',
-  '호수',
-  '별빛',
-  '유성',
-  '메아리',
-  '고래',
-  '구름',
-  '온도',
-  '이슬',
-];
 
 @Injectable()
 export class GroupService {
+  private static readonly MAX_NICKNAME_GENERATION_ATTEMPTS = 8;
+
   constructor(
     @InjectRepository(Classroom)
     private readonly classroomRepository: Repository<Classroom>,
@@ -57,12 +37,17 @@ export class GroupService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly chatRoomService: ChatRoomService,
+    private readonly openAiService: OpenAiService,
     @InjectRepository(Group)
     private readonly groupRepository: Repository<Group>,
     @InjectRepository(GroupMember)
     private readonly groupMemberRepository: Repository<GroupMember>,
     @InjectRepository(GroupNickname)
     private readonly groupNicknameRepository: Repository<GroupNickname>,
+    @InjectRepository(NicknameReservation)
+    private readonly nicknameReservationRepository: Repository<NicknameReservation>,
+    @InjectRepository(Survey)
+    private readonly surveyRepository: Repository<Survey>,
   ) {}
 
   async createGroup(
@@ -207,7 +192,7 @@ export class GroupService {
     await this.groupRepository.remove(group);
 
     return {
-      message: '모둠을 삭제했습니다.',
+      message: '모둠이 삭제되었습니다.',
     };
   }
 
@@ -273,7 +258,7 @@ export class GroupService {
     if (currentUser.role === UserRole.TEACHER) {
       if (group.classroom.teacherId !== currentUser.sub) {
         throw new ForbiddenException(
-          '본인 수업의 그룹 채팅에만 입장할 수 있습니다.',
+          '본인 수업의 그룹 채팅만 입장할 수 있습니다.',
         );
       }
 
@@ -302,7 +287,7 @@ export class GroupService {
     );
 
     if (!myGroupMember) {
-      throw new ForbiddenException('본인이 속한 그룹 채팅에만 입장할 수 있습니다.');
+      throw new ForbiddenException('본인이 속한 그룹 채팅만 입장할 수 있습니다.');
     }
 
     return {
@@ -336,6 +321,57 @@ export class GroupService {
         (groupMember) => groupMember.classParticipant.studentId,
       ),
     ];
+  }
+
+  async getMyGroupNickname(
+    currentUser: JwtPayload,
+    groupId: string,
+  ): Promise<GroupNicknameResponseDto> {
+    const group = await this.getGroupWithMembers(groupId);
+
+    if (currentUser.role === UserRole.TEACHER) {
+      if (group.classroom.teacherId !== currentUser.sub) {
+        throw new ForbiddenException('본인 수업의 그룹만 조회할 수 있습니다.');
+      }
+
+      const teacher = await this.userRepository.findOne({
+        where: {
+          userId: currentUser.sub,
+        },
+      });
+
+      if (!teacher) {
+        throw new NotFoundException('교사 정보를 찾을 수 없습니다.');
+      }
+
+      return {
+        groupId: group.groupId,
+        nickname: teacher.name,
+        reason: '교사는 익명 닉네임 대신 실명을 사용합니다.',
+      };
+    }
+
+    if (currentUser.role !== UserRole.STUDENT) {
+      throw new ForbiddenException('학생 또는 교강사만 닉네임을 조회할 수 있습니다.');
+    }
+
+    const myGroupMember = group.groupMembers.find(
+      (groupMember) => groupMember.classParticipant.studentId === currentUser.sub,
+    );
+
+    if (!myGroupMember) {
+      throw new ForbiddenException('본인이 속한 그룹의 닉네임만 조회할 수 있습니다.');
+    }
+
+    return {
+      groupId: group.groupId,
+      nickname:
+        myGroupMember.classParticipant.groupNickname?.nickname ??
+        myGroupMember.classParticipant.student.name,
+      reason:
+        myGroupMember.classParticipant.groupNickname?.nicknameReason ??
+        '설문 응답을 바탕으로 만든 익명 닉네임이에요.',
+    };
   }
 
   private async getGroupWithMembers(groupId: string): Promise<Group> {
@@ -377,6 +413,7 @@ export class GroupService {
         classParticipantId: classParticipant.classParticipantId,
       }),
     );
+
     await this.groupMemberRepository.save(groupMembers);
     await this.ensureClassScopedNicknames(classId, participants);
   }
@@ -400,55 +437,133 @@ export class GroupService {
         groupNickname.nickname,
       ]),
     );
-    const usedNicknames = new Set(
-      existingNicknames.map((groupNickname) => groupNickname.nickname),
+    const participantsWithoutNickname = participants.filter(
+      (classParticipant) =>
+        !existingNicknameMap.has(classParticipant.classParticipantId),
     );
-    const nicknamesToCreate = participants
-      .filter(
-        (classParticipant) =>
-          !existingNicknameMap.has(classParticipant.classParticipantId),
-      )
-      .map((classParticipant) =>
+
+    if (participantsWithoutNickname.length === 0) {
+      return;
+    }
+
+    const surveys = await this.surveyRepository.find({
+      where: {
+        userId: In(
+          participantsWithoutNickname.map(
+            (classParticipant) => classParticipant.studentId,
+          ),
+        ),
+      },
+    });
+    const surveyMap = new Map(surveys.map((survey) => [survey.userId, survey]));
+    const generatedInBatch = new Set<string>();
+    const nicknamesToCreate: GroupNickname[] = [];
+
+    for (const classParticipant of participantsWithoutNickname) {
+      const generatedNickname = await this.generateAndReserveUniqueNickname(
+        surveyMap.get(classParticipant.studentId) ?? null,
+        generatedInBatch,
+      );
+
+      nicknamesToCreate.push(
         this.groupNicknameRepository.create({
           classId,
           classParticipantId: classParticipant.classParticipantId,
-          nickname: this.generateUniqueNickname(usedNicknames),
+          nickname: generatedNickname.nickname,
+          nicknameReason: generatedNickname.reason,
         }),
       );
+    }
 
     if (nicknamesToCreate.length > 0) {
       await this.groupNicknameRepository.save(nicknamesToCreate);
     }
   }
 
-  private generateUniqueNickname(usedNicknames: Set<string>): string {
-    const totalCombinationCount =
-      GROUP_NICKNAME_ADJECTIVES.length * GROUP_NICKNAME_NOUNS.length;
+  private async generateAndReserveUniqueNickname(
+    survey: Survey | null,
+    generatedInBatch: Set<string>,
+  ): Promise<{ nickname: string; reason: string }> {
+    const attemptedNicknames: string[] = [];
 
-    while (usedNicknames.size < totalCombinationCount) {
-      const nickname = `${this.pickRandom(GROUP_NICKNAME_ADJECTIVES)} ${this.pickRandom(GROUP_NICKNAME_NOUNS)}`;
+    for (
+      let attempt = 0;
+      attempt < GroupService.MAX_NICKNAME_GENERATION_ATTEMPTS;
+      attempt += 1
+    ) {
+      const generatedNickname = await this.openAiService.generateStudentNickname({
+        survey,
+        attemptedNicknames,
+      });
+      const nickname = this.normalizeNickname(generatedNickname.nickname);
+      const reason = this.normalizeReason(generatedNickname.reason);
 
-      if (!usedNicknames.has(nickname)) {
-        usedNicknames.add(nickname);
-        return nickname;
+      if (!this.isValidNickname(nickname) || !this.isValidReason(reason)) {
+        attemptedNicknames.push(nickname);
+        continue;
+      }
+
+      if (generatedInBatch.has(nickname)) {
+        attemptedNicknames.push(nickname);
+        continue;
+      }
+
+      try {
+        await this.nicknameReservationRepository.insert({
+          nickname,
+        });
+        generatedInBatch.add(nickname);
+        return {
+          nickname,
+          reason,
+        };
+      } catch (error) {
+        if (this.isDuplicateNicknameReservationError(error)) {
+          attemptedNicknames.push(nickname);
+          continue;
+        }
+
+        throw error;
       }
     }
 
-    const fallbackBase = `${this.pickRandom(GROUP_NICKNAME_ADJECTIVES)} ${this.pickRandom(GROUP_NICKNAME_NOUNS)}`;
-    let suffix = 2;
-
-    while (usedNicknames.has(`${fallbackBase} ${suffix}`)) {
-      suffix += 1;
-    }
-
-    const fallbackNickname = `${fallbackBase} ${suffix}`;
-    usedNicknames.add(fallbackNickname);
-
-    return fallbackNickname;
+    throw new InternalServerErrorException(
+      '중복되지 않는 AI 닉네임 생성에 반복 실패했습니다.',
+    );
   }
 
-  private pickRandom(values: string[]): string {
-    return values[randomInt(0, values.length)];
+  private normalizeReason(reason: string): string {
+    return reason.replace(/\s+/g, ' ').trim();
+  }
+
+  private normalizeNickname(nickname: string): string {
+    return nickname.replace(/\s+/g, ' ').trim();
+  }
+
+  private isValidNickname(nickname: string): boolean {
+    return (
+      nickname.length >= 2 &&
+      nickname.length <= 30 &&
+      /^[A-Za-z0-9가-힣 ]+$/.test(nickname)
+    );
+  }
+
+  private isValidReason(reason: string): boolean {
+    return (
+      reason.length >= 5 &&
+      reason.length <= 60 &&
+      /^[A-Za-z0-9가-힣 .,!?]+$/.test(reason)
+    );
+  }
+
+  private isDuplicateNicknameReservationError(error: unknown): boolean {
+    if (!(error instanceof QueryFailedError)) {
+      return false;
+    }
+
+    const driverError = error.driverError as { code?: string } | undefined;
+
+    return driverError?.code === '23505';
   }
 
   private async getTeacherOwnedGroup(

@@ -3,6 +3,10 @@ import {
   GroupDetailResponseDto,
   GroupDetailMemberDto,
 } from './group-detail.response.dto';
+import {
+  GetGroupNicknameSuccessResponseDto,
+  GroupNicknameResponseDto,
+} from './group-nickname.response.dto';
 
 export class GetGroupDetailSuccessResponseDto {
   @ApiProperty({ example: true })
@@ -39,5 +43,7 @@ export class GetGroupDetailSuccessResponseDto {
 export const GroupGetExtraModels = [
   GroupDetailMemberDto,
   GroupDetailResponseDto,
+  GroupNicknameResponseDto,
   GetGroupDetailSuccessResponseDto,
+  GetGroupNicknameSuccessResponseDto,
 ] as const;

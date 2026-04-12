@@ -27,6 +27,9 @@ export class GroupNickname {
   @Column({ type: 'varchar', length: 100 })
   nickname!: string;
 
+  @Column({ type: 'varchar', length: 255, name: 'nickname_reason', nullable: true })
+  nicknameReason!: string | null;
+
   @CreateDateColumn()
   createdAt!: Date;
 

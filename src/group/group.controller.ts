@@ -32,6 +32,10 @@ import {
   GroupGetExtraModels,
 } from './dto/group-get.response.dto';
 import { GroupDetailResponseDto } from './dto/group-detail.response.dto';
+import {
+  GetGroupNicknameSuccessResponseDto,
+  GroupNicknameResponseDto,
+} from './dto/group-nickname.response.dto';
 import { UpdateGroupRequestDto } from './dto/update-group.request.dto';
 import { GroupService } from './group.service';
 
@@ -102,5 +106,20 @@ export class GroupController {
     @Param('groupId', new ParseUUIDPipe()) groupId: string,
   ): Promise<GroupDetailResponseDto> {
     return this.groupService.getGroupDetail(currentUser, groupId);
+  }
+
+  @Get(':groupId/nickname')
+  @ApiOperation({ summary: '내 모둠 닉네임 조회' })
+  @ApiOkResponse({
+    description:
+      '현재 사용자의 모둠 닉네임과 AI가 이 닉네임을 만든 한 줄 설명을 반환합니다.',
+    type: GetGroupNicknameSuccessResponseDto,
+  })
+  @ApiErrorResponses([401, 403, 404, 500])
+  async getMyGroupNickname(
+    @CurrentUser() currentUser: JwtPayload,
+    @Param('groupId', new ParseUUIDPipe()) groupId: string,
+  ): Promise<GroupNicknameResponseDto> {
+    return this.groupService.getMyGroupNickname(currentUser, groupId);
   }
 }

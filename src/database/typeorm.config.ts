@@ -11,6 +11,7 @@ import { Classroom } from '../class/entities/class.entity';
 import { Group } from '../group/entities/group.entity';
 import { GroupMember } from '../group/entities/group-member.entity';
 import { GroupNickname } from '../group/entities/group-nickname.entity';
+import { NicknameReservation } from '../group/entities/nickname-reservation.entity';
 import { Notice } from '../notice/entities/notice.entity';
 import { Survey } from '../survey/entities/survey.entity';
 
@@ -24,6 +25,7 @@ const databaseEntities = [
   Group,
   GroupMember,
   GroupNickname,
+  NicknameReservation,
   Notice,
   AssignmentSubmission,
   Survey,
