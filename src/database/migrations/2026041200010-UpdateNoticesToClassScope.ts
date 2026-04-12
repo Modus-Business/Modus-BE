@@ -1,9 +1,9 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class UpdateNoticesToClassScope202604120001
+export class UpdateNoticesToClassScope2026041200010
   implements MigrationInterface
 {
-  name = 'UpdateNoticesToClassScope202604120001';
+  name = 'UpdateNoticesToClassScope2026041200010';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
