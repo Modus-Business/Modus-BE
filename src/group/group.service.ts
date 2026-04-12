@@ -309,6 +309,31 @@ export class GroupService {
     };
   }
 
+  async getChatAudienceUserIds(groupId: string): Promise<string[]> {
+    const group = await this.groupRepository.findOne({
+      where: {
+        groupId,
+      },
+      relations: {
+        classroom: true,
+        groupMembers: {
+          classParticipant: true,
+        },
+      },
+    });
+
+    if (!group) {
+      throw new NotFoundException('해당 그룹을 찾을 수 없습니다.');
+    }
+
+    return [
+      group.classroom.teacherId,
+      ...group.groupMembers.map(
+        (groupMember) => groupMember.classParticipant.studentId,
+      ),
+    ];
+  }
+
   private async getGroupWithMembers(groupId: string): Promise<Group> {
     const group = await this.groupRepository.findOne({
       where: {

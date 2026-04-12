@@ -23,6 +23,7 @@ import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { TokenService } from '../auth/login/token/token.service';
 import { GroupService } from '../group/group.service';
 import { ChatService } from './chat.service';
+import { ChatMessageResponseDto } from './dto/chat-message.response.dto';
 import { JoinChatRequestDto } from './dto/join-chat.request.dto';
 import { SendChatMessageRequestDto } from './dto/send-chat-message.request.dto';
 
@@ -168,7 +169,7 @@ export class ChatGateway
     );
 
     client.data.nickname = participant.nickname;
-    this.server.to(participant.groupId).emit('chat.message', message);
+    await this.emitMessageToAuthorizedSockets(participant.groupId, message);
   }
 
   private authenticateClient(client: ChatSocket): JwtPayload {
@@ -220,5 +221,34 @@ export class ChatGateway
 
     recentMessageTimestamps.push(now);
     client.data.recentMessageTimestamps = recentMessageTimestamps;
+  }
+
+  private async emitMessageToAuthorizedSockets(
+    groupId: string,
+    message: ChatMessageResponseDto,
+  ): Promise<void> {
+    const authorizedUserIds = new Set(
+      await this.groupService.getChatAudienceUserIds(groupId),
+    );
+    const sockets = await this.server.in(groupId).fetchSockets();
+
+    await Promise.all(
+      sockets.map(async (socket) => {
+        const chatSocket = socket as unknown as ChatSocket;
+        const userId = chatSocket.data.currentUser?.sub;
+
+        if (userId && authorizedUserIds.has(userId)) {
+          socket.emit('chat.message', message);
+          return;
+        }
+
+        await socket.leave(groupId);
+
+        if (chatSocket.data.groupId === groupId) {
+          chatSocket.data.groupId = undefined;
+          chatSocket.data.nickname = undefined;
+        }
+      }),
+    );
   }
 }
