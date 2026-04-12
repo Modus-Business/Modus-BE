@@ -4,7 +4,11 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomInt } from 'node:crypto';
 import { extname } from 'node:path';
@@ -69,6 +73,32 @@ export class StorageService {
     }
   }
 
+  async createPresignedDownloadUrl(fileUrl: string): Promise<string> {
+    const normalizedFileUrl = fileUrl.trim();
+    const fileKey = this.extractObjectKey(normalizedFileUrl);
+    const { bucket, s3Client } = this.getClientOptions();
+    const expiresInSeconds = Number(
+      this.configService.get<string>(
+        'AWS_S3_PRESIGNED_EXPIRES_IN',
+        String(DEFAULT_PRESIGNED_EXPIRES_IN_SECONDS),
+      ),
+    );
+    const downloadCommand = new GetObjectCommand({
+      Bucket: bucket,
+      Key: fileKey,
+    });
+
+    try {
+      return await getSignedUrl(s3Client, downloadCommand, {
+        expiresIn: expiresInSeconds,
+      });
+    } catch {
+      throw new InternalServerErrorException(
+        '다운로드 URL을 생성하지 못했습니다.',
+      );
+    }
+  }
+
   private createObjectKey(
     userId: string,
     purpose: string,
@@ -112,6 +142,26 @@ export class StorageService {
       .replaceAll('\\', '-')
       .replaceAll('/', '-')
       .replace(SAFE_FILE_NAME_PATTERN, '-');
+  }
+
+  private extractObjectKey(fileUrl: string): string {
+    let pathname: string;
+
+    try {
+      pathname = new URL(fileUrl).pathname;
+    } catch {
+      throw new BadRequestException('fileUrl 형식이 올바르지 않습니다.');
+    }
+
+    const fileKey = decodeURIComponent(pathname).replace(/^\/+/, '');
+
+    if (!fileKey.startsWith('assignments/')) {
+      throw new BadRequestException(
+        'assignments 경로 파일만 다운로드할 수 있습니다.',
+      );
+    }
+
+    return fileKey;
   }
 
   private getClientOptions(): {

@@ -9,6 +9,7 @@ import { Repository } from 'typeorm';
 import { UserRole } from '../auth/signup/enums/user-role.enum';
 import { Classroom } from '../class/entities/class.entity';
 import { Group } from '../group/entities/group.entity';
+import { StorageService } from '../storage/storage.service';
 import { AssignmentService } from './assignment.service';
 import { AssignmentSubmission } from './entities/assignment-submission.entity';
 
@@ -19,6 +20,7 @@ describe('AssignmentService', () => {
   >;
   let groupRepository: jest.Mocked<Repository<Group>>;
   let classroomRepository: jest.Mocked<Repository<Classroom>>;
+  let storageService: jest.Mocked<StorageService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -65,6 +67,12 @@ describe('AssignmentService', () => {
             findOne: jest.fn(),
           },
         },
+        {
+          provide: StorageService,
+          useValue: {
+            createPresignedDownloadUrl: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -74,6 +82,7 @@ describe('AssignmentService', () => {
     );
     groupRepository = module.get(getRepositoryToken(Group));
     classroomRepository = module.get(getRepositoryToken(Classroom));
+    storageService = module.get(StorageService);
   });
 
   it('학생이 자기 모둠 결과물을 제출할 수 있다', async () => {
@@ -118,6 +127,9 @@ describe('AssignmentService', () => {
     );
 
     expect(result.groupId).toBe('group-1');
+    expect(result.fileUrl).toBe(
+      '/assignments/submissions/submission-1/download',
+    );
   });
 
   it('fileUrl과 link가 모두 없으면 BadRequestException이 발생한다', async () => {
@@ -201,6 +213,9 @@ describe('AssignmentService', () => {
 
     expect(result.submissions).toHaveLength(1);
     expect(result.submissions[0].isSubmitted).toBe(true);
+    expect(result.submissions[0].fileUrl).toBe(
+      '/assignments/submissions/submission-1/download',
+    );
   });
 
   it('학생이 자기 모둠이 아니면 제출할 수 없다', async () => {
@@ -222,5 +237,41 @@ describe('AssignmentService', () => {
         },
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('제출 다운로드 요청 시 presigned download URL을 발급한다', async () => {
+    assignmentSubmissionRepository.findOne.mockResolvedValue({
+      submissionId: '11111111-1111-1111-1111-111111111111',
+      groupId: 'group-1',
+      fileUrl:
+        'https://modus-files-bucket.s3.ap-northeast-2.amazonaws.com/assignments/2026/04/11/student-1-result.pdf',
+    } as AssignmentSubmission);
+    groupRepository.findOne.mockResolvedValue({
+      groupId: 'group-1',
+      groupMembers: [
+        {
+          classParticipant: {
+            studentId: 'student-1',
+          },
+        },
+      ],
+    } as unknown as Group);
+    storageService.createPresignedDownloadUrl.mockResolvedValue(
+      'https://signed.example.com/download',
+    );
+
+    const result = await assignmentService.getSubmissionDownloadUrl(
+      {
+        sub: 'student-1',
+        email: 'student@example.com',
+        role: UserRole.STUDENT,
+      },
+      '11111111-1111-1111-1111-111111111111',
+    );
+
+    expect(result).toBe('https://signed.example.com/download');
+    expect(storageService.createPresignedDownloadUrl).toHaveBeenCalledWith(
+      'https://modus-files-bucket.s3.ap-northeast-2.amazonaws.com/assignments/2026/04/11/student-1-result.pdf',
+    );
   });
 });

@@ -5,6 +5,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -14,6 +15,7 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -87,5 +89,24 @@ export class AssignmentController {
       currentUser,
       classId,
     );
+  }
+
+  @Get(':submissionId/download')
+  @ApiOperation({ summary: '제출 파일 다운로드' })
+  @ApiOkResponse({
+    description: '권한을 확인한 뒤 S3 presigned download URL로 리다이렉트합니다.',
+  })
+  @ApiErrorResponses([401, 403, 404, 500])
+  async downloadSubmissionFile(
+    @CurrentUser() currentUser: JwtPayload,
+    @Param('submissionId', new ParseUUIDPipe()) submissionId: string,
+    @Res() response: Response,
+  ): Promise<void> {
+    const downloadUrl = await this.assignmentService.getSubmissionDownloadUrl(
+      currentUser,
+      submissionId,
+    );
+
+    response.redirect(downloadUrl);
   }
 }

@@ -8,8 +8,9 @@ export class AssignmentSubmissionItemDto {
   groupId!: string;
 
   @ApiProperty({
-    example: 'https://storage.example.com/files/result.pdf',
+    example: '/assignments/submissions/11111111-1111-1111-1111-111111111111/download',
     nullable: true,
+    description: '제출 파일 다운로드용 백엔드 endpoint입니다.',
   })
   fileUrl!: string | null;
 
@@ -46,8 +47,9 @@ export class AssignmentSubmissionStatusDto {
   submissionId!: string | null;
 
   @ApiProperty({
-    example: 'https://storage.example.com/files/result.pdf',
+    example: '/assignments/submissions/11111111-1111-1111-1111-111111111111/download',
     nullable: true,
+    description: '제출 파일 다운로드용 백엔드 endpoint입니다.',
   })
   fileUrl!: string | null;
 

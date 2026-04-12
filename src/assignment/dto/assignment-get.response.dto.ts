@@ -18,7 +18,8 @@ export class GetMySubmissionSuccessResponseDto {
     example: {
       submissionId: 'submission-1',
       groupId: 'group-1',
-      fileUrl: 'https://storage.example.com/files/result.pdf',
+      fileUrl:
+        '/assignments/submissions/11111111-1111-1111-1111-111111111111/download',
       link: null,
       submittedBy: 'student-1',
       submittedAt: '2026-04-10T12:00:00.000Z',
@@ -50,7 +51,8 @@ export class GetClassSubmissionStatusesSuccessResponseDto {
           groupName: 'Group 3',
           isSubmitted: true,
           submissionId: 'submission-1',
-          fileUrl: 'https://storage.example.com/files/result.pdf',
+          fileUrl:
+            '/assignments/submissions/11111111-1111-1111-1111-111111111111/download',
           link: null,
           submittedAt: '2026-04-10T12:00:00.000Z',
         },

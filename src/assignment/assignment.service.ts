@@ -11,6 +11,7 @@ import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { UserRole } from '../auth/signup/enums/user-role.enum';
 import { Classroom } from '../class/entities/class.entity';
 import { Group } from '../group/entities/group.entity';
+import { StorageService } from '../storage/storage.service';
 import {
   AssignmentSubmissionItemDto,
   AssignmentSubmissionStatusListResponseDto,
@@ -28,6 +29,7 @@ export class AssignmentService {
     @InjectRepository(Classroom)
     private readonly classroomRepository: Repository<Classroom>,
     private readonly configService: ConfigService,
+    private readonly storageService: StorageService,
   ) {}
 
   async submitAssignment(
@@ -149,12 +151,37 @@ export class AssignmentService {
           groupName: group.name,
           isSubmitted: !!submission,
           submissionId: submission?.submissionId ?? null,
-          fileUrl: submission?.fileUrl ?? null,
+          fileUrl: submission?.submissionId
+            ? this.createSubmissionDownloadPath(submission.submissionId)
+            : null,
           link: submission?.link ?? null,
           submittedAt: submission?.submittedAt ?? null,
         };
       }),
     };
+  }
+
+  async getSubmissionDownloadUrl(
+    currentUser: JwtPayload,
+    submissionId: string,
+  ): Promise<string> {
+    const submission = await this.assignmentSubmissionRepository.findOne({
+      where: {
+        submissionId,
+      },
+    });
+
+    if (!submission) {
+      throw new NotFoundException('해당 제출을 찾을 수 없습니다.');
+    }
+
+    if (!submission.fileUrl) {
+      throw new NotFoundException('다운로드할 제출 파일이 없습니다.');
+    }
+
+    await this.ensureSubmissionAccess(currentUser, submission.groupId);
+
+    return this.storageService.createPresignedDownloadUrl(submission.fileUrl);
   }
 
   private validateAssignmentFileUrl(fileUrl: string): void {
@@ -236,17 +263,65 @@ export class AssignmentService {
     return group;
   }
 
+  private async ensureSubmissionAccess(
+    currentUser: JwtPayload,
+    groupId: string,
+  ): Promise<void> {
+    if (currentUser.role === UserRole.STUDENT) {
+      await this.getStudentAccessibleGroup(currentUser, groupId);
+      return;
+    }
+
+    if (currentUser.role === UserRole.TEACHER) {
+      const group = await this.groupRepository.findOne({
+        where: {
+          groupId,
+        },
+      });
+
+      if (!group) {
+        throw new NotFoundException('해당 모둠을 찾을 수 없습니다.');
+      }
+
+      const classroom = await this.classroomRepository.findOne({
+        where: {
+          classId: group.classId,
+        },
+      });
+
+      if (!classroom) {
+        throw new NotFoundException('해당 수업을 찾을 수 없습니다.');
+      }
+
+      if (classroom.teacherId !== currentUser.sub) {
+        throw new ForbiddenException(
+          '본인이 담당한 수업의 제출만 다운로드할 수 있습니다.',
+        );
+      }
+
+      return;
+    }
+
+    throw new ForbiddenException('제출 파일을 다운로드할 권한이 없습니다.');
+  }
+
   private toSubmissionItem(
     submission: AssignmentSubmission,
   ): AssignmentSubmissionItemDto {
     return {
       submissionId: submission.submissionId,
       groupId: submission.groupId,
-      fileUrl: submission.fileUrl,
+      fileUrl: submission.fileUrl
+        ? this.createSubmissionDownloadPath(submission.submissionId)
+        : null,
       link: submission.link,
       submittedBy: submission.submittedBy,
       submittedAt: submission.submittedAt,
       updatedAt: submission.updatedAt,
     };
+  }
+
+  private createSubmissionDownloadPath(submissionId: string): string {
+    return `/assignments/submissions/${submissionId}/download`;
   }
 }
