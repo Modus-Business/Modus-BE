@@ -17,6 +17,17 @@ export class GetClassGroupsSuccessResponseDto {
           classId: '0a11d54c-c75a-4d10-a4a0-1fd224c636c7',
           name: '모둠 3',
           memberCount: 4,
+          members: [
+            {
+              groupMemberId: 'group-member-1',
+              classParticipantId: 'participant-1',
+              studentId: 'student-1',
+              studentName: '홍길동',
+              email: 'student@example.com',
+              nickname: '조용한 구름',
+              joinedAt: '2026-04-10T12:30:00.000Z',
+            },
+          ],
           createdAt: '2026-04-10T12:00:00.000Z',
         },
       ],

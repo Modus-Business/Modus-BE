@@ -97,7 +97,12 @@ export class ClassService {
       },
       relations: {
         groups: {
-          groupMembers: true,
+          groupMembers: {
+            classParticipant: {
+              student: true,
+              groupNickname: true,
+            },
+          },
         },
       },
       order: {
@@ -125,6 +130,15 @@ export class ClassService {
         classId: group.classId,
         name: group.name,
         memberCount: group.groupMembers.length,
+        members: group.groupMembers.map((groupMember) => ({
+          groupMemberId: groupMember.groupMemberId,
+          classParticipantId: groupMember.classParticipantId,
+          studentId: groupMember.classParticipant.studentId,
+          studentName: groupMember.classParticipant.student.name,
+          email: groupMember.classParticipant.student.email,
+          nickname: groupMember.classParticipant.groupNickname?.nickname ?? null,
+          joinedAt: groupMember.joinedAt,
+        })),
         createdAt: group.createdAt,
       })),
     };
