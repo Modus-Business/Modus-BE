@@ -4,6 +4,7 @@ import { ChatService } from './chat.service';
 import { GroupService } from '../group/group.service';
 import { TokenService } from '../auth/login/token/token.service';
 import { ConfigService } from '@nestjs/config';
+import { ChatRoomService } from './chat-room.service';
 
 describe('ChatGateway', () => {
   let chatGateway: ChatGateway;
@@ -26,6 +27,10 @@ describe('ChatGateway', () => {
       chatService as unknown as ChatService,
       {} as TokenService,
       groupService as unknown as GroupService,
+      {
+        registerSyncGroupAudienceHandler: jest.fn(),
+        registerCloseGroupHandler: jest.fn(),
+      } as unknown as ChatRoomService,
       {
         get: jest.fn(),
       } as unknown as ConfigService,

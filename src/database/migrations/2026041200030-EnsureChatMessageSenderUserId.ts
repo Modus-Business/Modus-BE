@@ -30,22 +30,8 @@ export class EnsureChatMessageSenderUserId2026041200030
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`
-      DO $$
-      BEGIN
-        IF EXISTS (
-          SELECT 1
-          FROM pg_constraint
-          WHERE conname = 'FK_chat_messages_sender_user_id_users_userId'
-        ) THEN
-          ALTER TABLE "chat_messages"
-          DROP CONSTRAINT "FK_chat_messages_sender_user_id_users_userId";
-        END IF;
-      END $$;
-    `);
-    await queryRunner.query(`
-      ALTER TABLE "chat_messages"
-      DROP COLUMN IF EXISTS "sender_user_id"
-    `);
+    // This repair migration is intentionally not reversible because
+    // environments may already rely on sender_user_id existing.
+    await queryRunner.query('SELECT 1');
   }
 }

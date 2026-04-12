@@ -2,6 +2,7 @@ import { ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { ChatRoomService } from '../chat/chat-room.service';
 import { User } from '../auth/signup/entities/user.entity';
 import { UserRole } from '../auth/signup/enums/user-role.enum';
 import { ClassParticipant } from '../class/entities/class-participant.entity';
@@ -17,6 +18,7 @@ describe('GroupService', () => {
   let classroomRepository: jest.Mocked<Repository<Classroom>>;
   let classParticipantRepository: jest.Mocked<Repository<ClassParticipant>>;
   let userRepository: jest.Mocked<Repository<User>>;
+  let chatRoomService: jest.Mocked<ChatRoomService>;
   let groupRepository: jest.Mocked<Repository<Group>>;
   let groupMemberRepository: jest.Mocked<Repository<GroupMember>>;
   let groupNicknameRepository: jest.Mocked<Repository<GroupNickname>>;
@@ -41,6 +43,13 @@ describe('GroupService', () => {
           provide: getRepositoryToken(User),
           useValue: {
             findOne: jest.fn(),
+          },
+        },
+        {
+          provide: ChatRoomService,
+          useValue: {
+            syncGroupAudience: jest.fn(),
+            closeGroup: jest.fn(),
           },
         },
         {
@@ -78,6 +87,7 @@ describe('GroupService', () => {
     classroomRepository = module.get(getRepositoryToken(Classroom));
     classParticipantRepository = module.get(getRepositoryToken(ClassParticipant));
     userRepository = module.get(getRepositoryToken(User));
+    chatRoomService = module.get(ChatRoomService);
     groupRepository = module.get(getRepositoryToken(Group));
     groupMemberRepository = module.get(getRepositoryToken(GroupMember));
     groupNicknameRepository = module.get(getRepositoryToken(GroupNickname));
@@ -143,6 +153,7 @@ describe('GroupService', () => {
       createdAt,
     });
     expect(groupNicknameRepository.create).toHaveBeenCalledTimes(2);
+    expect(chatRoomService.syncGroupAudience).not.toHaveBeenCalled();
   });
 
   it('moves a student from another group when creating a new group', async () => {
@@ -202,6 +213,92 @@ describe('GroupService', () => {
         groupMemberId: 'group-member-1',
       }),
     ]);
+  });
+
+  it('syncs chat audience after updating group members', async () => {
+    groupRepository.findOne.mockResolvedValueOnce({
+      groupId: 'group-1',
+      classId: 'class-1',
+      name: '모둠 1',
+      createdAt: new Date('2026-04-10T12:00:00.000Z'),
+      updatedAt: new Date('2026-04-10T12:00:00.000Z'),
+      classroom: {
+        classId: 'class-1',
+        teacherId: 'teacher-1',
+      },
+    } as unknown as Group);
+    classParticipantRepository.find.mockResolvedValue([
+      {
+        classParticipantId: 'participant-2',
+        classId: 'class-1',
+        studentId: 'student-2',
+      },
+    ] as ClassParticipant[]);
+    groupMemberRepository.find.mockResolvedValue([
+      {
+        groupMemberId: 'group-member-1',
+        groupId: 'group-1',
+        classParticipantId: 'participant-1',
+      },
+    ] as GroupMember[]);
+    groupRepository.save.mockResolvedValue({
+      groupId: 'group-1',
+      classId: 'class-1',
+      name: '모둠 2',
+      createdAt: new Date('2026-04-10T12:00:00.000Z'),
+      updatedAt: new Date('2026-04-10T13:00:00.000Z'),
+    } as Group);
+    groupMemberRepository.create.mockImplementation(
+      (input) => input as GroupMember,
+    );
+    groupMemberRepository.save.mockResolvedValue([] as unknown as never);
+    groupNicknameRepository.find.mockResolvedValue([] as GroupNickname[]);
+    groupNicknameRepository.create.mockImplementation(
+      (input) => input as GroupNickname,
+    );
+    groupNicknameRepository.save.mockResolvedValue([] as unknown as never);
+    groupMemberRepository.count.mockResolvedValue(1);
+
+    await groupService.updateGroup(
+      {
+        sub: 'teacher-1',
+        email: 'teacher@example.com',
+        role: UserRole.TEACHER,
+      },
+      'group-1',
+      {
+        name: '모둠 2',
+        studentIds: ['student-2'],
+      },
+    );
+
+    expect(chatRoomService.syncGroupAudience).toHaveBeenCalledWith('group-1');
+  });
+
+  it('closes the chat room before deleting a group', async () => {
+    groupRepository.findOne.mockResolvedValue({
+      groupId: 'group-1',
+      classId: 'class-1',
+      name: '모둠 1',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      classroom: {
+        classId: 'class-1',
+        teacherId: 'teacher-1',
+      },
+    } as unknown as Group);
+
+    await groupService.deleteGroup(
+      {
+        sub: 'teacher-1',
+        email: 'teacher@example.com',
+        role: UserRole.TEACHER,
+      },
+      'group-1',
+    );
+
+    expect(chatRoomService.closeGroup).toHaveBeenCalledWith('group-1');
+    expect(groupRepository.remove).toHaveBeenCalled();
   });
 
   it('returns class-scoped nicknames to student members in group detail', async () => {

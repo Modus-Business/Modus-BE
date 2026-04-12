@@ -22,6 +22,7 @@ import { WsExceptionFilter } from '../common/filters/ws-exception.filter';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { TokenService } from '../auth/login/token/token.service';
 import { GroupService } from '../group/group.service';
+import { ChatRoomService } from './chat-room.service';
 import { ChatService } from './chat.service';
 import { ChatMessageResponseDto } from './dto/chat-message.response.dto';
 import { JoinChatRequestDto } from './dto/join-chat.request.dto';
@@ -66,6 +67,7 @@ export class ChatGateway
     private readonly chatService: ChatService,
     private readonly tokenService: TokenService,
     private readonly groupService: GroupService,
+    private readonly chatRoomService: ChatRoomService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -80,6 +82,13 @@ export class ChatGateway
         credentials: true,
       };
     }
+
+    this.chatRoomService.registerSyncGroupAudienceHandler(async (groupId) => {
+      await this.syncGroupAudience(groupId);
+    });
+    this.chatRoomService.registerCloseGroupHandler(async (groupId) => {
+      await this.closeGroup(groupId);
+    });
 
     server.use((socket, next) => {
       const origin = socket.handshake.headers.origin;
@@ -232,6 +241,22 @@ export class ChatGateway
     groupId: string,
     message: ChatMessageResponseDto,
   ): Promise<void> {
+    const authorizedUserIds = await this.syncGroupAudience(groupId);
+    const sockets = await this.server.in(groupId).fetchSockets();
+
+    await Promise.all(
+      sockets.map(async (socket) => {
+        const chatSocket = socket as unknown as ChatSocket;
+        const userId = chatSocket.data.currentUser?.sub;
+
+        if (userId && authorizedUserIds.has(userId)) {
+          socket.emit('chat.message', message);
+        }
+      }),
+    );
+  }
+
+  private async syncGroupAudience(groupId: string): Promise<Set<string>> {
     const authorizedUserIds = new Set(
       await this.groupService.getChatAudienceUserIds(groupId),
     );
@@ -243,7 +268,6 @@ export class ChatGateway
         const userId = chatSocket.data.currentUser?.sub;
 
         if (userId && authorizedUserIds.has(userId)) {
-          socket.emit('chat.message', message);
           return;
         }
 
@@ -253,6 +277,34 @@ export class ChatGateway
           chatSocket.data.groupId = undefined;
           chatSocket.data.nickname = undefined;
         }
+      }),
+    );
+
+    return authorizedUserIds;
+  }
+
+  private async closeGroup(groupId: string): Promise<void> {
+    const sockets = await this.server.in(groupId).fetchSockets();
+
+    await Promise.all(
+      sockets.map(async (socket) => {
+        const chatSocket = socket as unknown as ChatSocket;
+
+        await socket.leave(groupId);
+
+        if (chatSocket.data.groupId === groupId) {
+          chatSocket.data.groupId = undefined;
+          chatSocket.data.nickname = undefined;
+        }
+
+        socket.emit('chat.error', {
+          success: false,
+          statusCode: 410,
+          message: '그룹 채팅이 종료되었습니다.',
+          error: 'Gone',
+          timestamp: new Date().toISOString(),
+          event: 'group.closed',
+        });
       }),
     );
   }

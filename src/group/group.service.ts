@@ -9,6 +9,7 @@ import { In, Repository } from 'typeorm';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { User } from '../auth/signup/entities/user.entity';
 import { UserRole } from '../auth/signup/enums/user-role.enum';
+import { ChatRoomService } from '../chat/chat-room.service';
 import { ClassParticipant } from '../class/entities/class-participant.entity';
 import { Classroom } from '../class/entities/class.entity';
 import { CreateGroupRequestDto } from './dto/create-group.request.dto';
@@ -55,6 +56,7 @@ export class GroupService {
     private readonly classParticipantRepository: Repository<ClassParticipant>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private readonly chatRoomService: ChatRoomService,
     @InjectRepository(Group)
     private readonly groupRepository: Repository<Group>,
     @InjectRepository(GroupMember)
@@ -178,6 +180,7 @@ export class GroupService {
 
     group.name = request.name.trim();
     const savedGroup = await this.groupRepository.save(group);
+    await this.chatRoomService.syncGroupAudience(groupId);
 
     const memberCount = await this.groupMemberRepository.count({
       where: {
@@ -200,6 +203,7 @@ export class GroupService {
   ): Promise<DeleteGroupResponseDto> {
     const group = await this.getTeacherOwnedGroup(currentUser, groupId);
 
+    await this.chatRoomService.closeGroup(groupId);
     await this.groupRepository.remove(group);
 
     return {
