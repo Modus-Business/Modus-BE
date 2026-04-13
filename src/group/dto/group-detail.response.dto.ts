@@ -18,6 +18,9 @@ export class GroupDetailResponseDto {
   @ApiProperty({ example: 'class-1' })
   classId!: string;
 
+  @ApiProperty({ example: 'CLASS2026' })
+  classCode!: string;
+
   @ApiProperty({ example: '모둠 3' })
   name!: string;
 

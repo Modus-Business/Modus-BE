@@ -20,6 +20,7 @@ export class GetGroupDetailSuccessResponseDto {
     example: {
       groupId: 'group-1',
       classId: 'class-1',
+      classCode: 'CLASS2026',
       name: 'Group 3',
       memberCount: 4,
       members: [

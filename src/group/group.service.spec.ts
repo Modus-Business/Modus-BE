@@ -379,6 +379,7 @@ describe('GroupService', () => {
       updatedAt: new Date('2026-04-10T12:00:00.000Z'),
       classroom: {
         classId: 'class-1',
+        classCode: 'CLASS2026',
         teacherId: 'teacher-1',
       },
     } as unknown as Group);
@@ -502,6 +503,7 @@ describe('GroupService', () => {
       displayName: '차분한 설계자',
       isMe: true,
     });
+    expect(result.classCode).toBe('CLASS2026');
   });
 
   it('returns my group nickname and reason for students', async () => {

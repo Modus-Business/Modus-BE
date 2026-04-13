@@ -212,6 +212,7 @@ export class GroupService {
       return {
         groupId: group.groupId,
         classId: group.classId,
+        classCode: group.classroom.classCode,
         name: group.name,
         memberCount: group.groupMembers.length,
         members: group.groupMembers.map((groupMember) => ({
@@ -237,6 +238,7 @@ export class GroupService {
     return {
       groupId: group.groupId,
       classId: group.classId,
+      classCode: group.classroom.classCode,
       name: group.name,
       memberCount: group.groupMembers.length,
       members: group.groupMembers.map((groupMember) => ({
