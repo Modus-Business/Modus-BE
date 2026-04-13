@@ -1,8 +1,16 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { UserRole } from '../auth/signup/enums/user-role.enum';
 import { GroupService } from '../group/group.service';
+import type { GeneratedContributionAnalysis } from '../openai/openai.service';
 import { OpenAiService } from '../openai/openai.service';
 import { ChatContributionAnalysisRequestDto } from './dto/chat-contribution-analysis.request.dto';
 import {
@@ -17,9 +25,31 @@ import { ChatMessageResponseDto } from './dto/chat-message.response.dto';
 import { ChatMessage } from './entities/chat-message.entity';
 
 const CHAT_HISTORY_LIMIT = 50;
+const AI_CACHE_TTL_MS = 30_000;
+const AI_RATE_LIMIT_BUCKETS = {
+  messageAdvice: { windowMs: 30_000, maxRequests: 8 },
+  interventionAdvice: { windowMs: 60_000, maxRequests: 6 },
+  contributionAnalysis: { windowMs: 60_000, maxRequests: 4 },
+} as const;
+
+type AiCacheEntry<T> = {
+  expiresAt: number;
+  fingerprint: string;
+  value: T;
+};
 
 @Injectable()
 export class ChatService {
+  private readonly aiRequestHistory = new Map<string, number[]>();
+  private readonly interventionAdviceCache = new Map<
+    string,
+    AiCacheEntry<ChatInterventionAdviceResponseDto>
+  >();
+  private readonly contributionAnalysisCache = new Map<
+    string,
+    AiCacheEntry<ChatContributionAnalysisResponseDto>
+  >();
+
   constructor(
     @InjectRepository(ChatMessage)
     private readonly chatMessageRepository: Repository<ChatMessage>,
@@ -29,12 +59,8 @@ export class ChatService {
 
   async getRecentMessages(groupId: string): Promise<ChatMessageResponseDto[]> {
     const messages = await this.chatMessageRepository.find({
-      where: {
-        groupId,
-      },
-      order: {
-        sentAt: 'DESC',
-      },
+      where: { groupId },
+      order: { sentAt: 'DESC' },
       take: CHAT_HISTORY_LIMIT,
     });
 
@@ -68,21 +94,28 @@ export class ChatService {
     currentUser: JwtPayload,
     request: ChatMessageAdviceRequestDto,
   ): Promise<ChatMessageAdviceResponseDto> {
+    const trimmedContent = request.content.trim();
+
+    if (!trimmedContent) {
+      throw new BadRequestException('content는 공백만 보낼 수 없습니다.');
+    }
+
+    this.enforceAiRateLimit(
+      `message-advice:${currentUser.sub}:${request.groupId}`,
+      AI_RATE_LIMIT_BUCKETS.messageAdvice,
+    );
+
     const participant = await this.groupService.getChatParticipantInfo(
       currentUser,
       request.groupId,
     );
     const recentMessages = await this.chatMessageRepository.find({
-      where: {
-        groupId: participant.groupId,
-      },
-      order: {
-        sentAt: 'DESC',
-      },
+      where: { groupId: participant.groupId },
+      order: { sentAt: 'DESC' },
       take: 5,
     });
     const advice = await this.openAiService.generateMessageAdvice({
-      content: request.content.trim(),
+      content: trimmedContent,
       recentMessages: recentMessages
         .reverse()
         .map((message) => `${message.nickname}: ${message.content}`),
@@ -101,79 +134,123 @@ export class ChatService {
     currentUser: JwtPayload,
     request: ChatInterventionAdviceRequestDto,
   ): Promise<ChatInterventionAdviceResponseDto> {
-    const participant = await this.groupService.getChatParticipantInfo(
+    this.enforceAiRateLimit(
+      `intervention-advice:${currentUser.sub}:${request.groupId}`,
+      AI_RATE_LIMIT_BUCKETS.interventionAdvice,
+    );
+
+    const roster = await this.groupService.getGroupAnalysisRoster(
       currentUser,
       request.groupId,
     );
     const recentMessages = await this.chatMessageRepository.find({
-      where: {
-        groupId: participant.groupId,
-      },
-      order: {
-        sentAt: 'DESC',
-      },
+      where: { groupId: roster.groupId },
+      order: { sentAt: 'DESC' },
       take: 20,
     });
     const normalizedMessages = recentMessages.reverse();
-    const participantMessageCounts = normalizedMessages.reduce<Record<string, number>>(
-      (acc, message) => {
-        acc[message.nickname] = (acc[message.nickname] ?? 0) + 1;
-        return acc;
-      },
-      {},
+    const participantMessageCounts = this.buildParticipantMessageCounts(
+      roster.participantNicknames,
+      normalizedMessages,
     );
+    const cacheKey = `intervention:${roster.groupId}`;
+    const fingerprint = JSON.stringify({
+      participantNicknames: roster.participantNicknames,
+      recentMessageIds: normalizedMessages.map((message) => message.messageId),
+      recentMessageContents: normalizedMessages.map((message) => message.content),
+    });
+    const cachedAdvice = this.getCachedResponse(
+      this.interventionAdviceCache,
+      cacheKey,
+      fingerprint,
+    );
+
+    if (cachedAdvice) {
+      return cachedAdvice;
+    }
+
     const advice = await this.openAiService.generateInterventionAdvice({
       recentMessages: normalizedMessages.map(
         (message) => `${message.nickname}: ${message.content}`,
       ),
+      participantNicknames: roster.participantNicknames,
       participantMessageCounts,
     });
-
-    return {
-      groupId: participant.groupId,
+    const response = {
+      groupId: roster.groupId,
       interventionNeeded: advice.interventionNeeded,
       interventionType: advice.interventionType,
       reason: advice.reason,
       suggestedMessage: advice.suggestedMessage,
     };
+
+    this.setCachedResponse(
+      this.interventionAdviceCache,
+      cacheKey,
+      fingerprint,
+      response,
+    );
+
+    return response;
   }
 
   async getContributionAnalysis(
     currentUser: JwtPayload,
     request: ChatContributionAnalysisRequestDto,
   ): Promise<ChatContributionAnalysisResponseDto> {
-    const participant = await this.groupService.getChatParticipantInfo(
+    if (currentUser.role !== UserRole.TEACHER) {
+      throw new ForbiddenException('교강사만 기여도 분석을 조회할 수 있습니다.');
+    }
+
+    this.enforceAiRateLimit(
+      `contribution-analysis:${currentUser.sub}:${request.groupId}`,
+      AI_RATE_LIMIT_BUCKETS.contributionAnalysis,
+    );
+
+    const roster = await this.groupService.getTeacherContributionRoster(
       currentUser,
       request.groupId,
     );
     const recentMessages = await this.chatMessageRepository.find({
-      where: {
-        groupId: participant.groupId,
-      },
-      order: {
-        sentAt: 'DESC',
-      },
+      where: { groupId: roster.groupId },
+      order: { sentAt: 'DESC' },
       take: 30,
     });
     const normalizedMessages = recentMessages.reverse();
-    const participantMessageCounts = normalizedMessages.reduce<Record<string, number>>(
-      (acc, message) => {
-        acc[message.nickname] = (acc[message.nickname] ?? 0) + 1;
-        return acc;
-      },
-      {},
+    const participantMessageCounts = this.buildParticipantMessageCounts(
+      roster.participantNicknames,
+      normalizedMessages,
     );
+    const cacheKey = `contribution:${roster.groupId}`;
+    const fingerprint = JSON.stringify({
+      participantNicknames: roster.participantNicknames,
+      recentMessageIds: normalizedMessages.map((message) => message.messageId),
+      recentMessageContents: normalizedMessages.map((message) => message.content),
+    });
+    const cachedAnalysis = this.getCachedResponse(
+      this.contributionAnalysisCache,
+      cacheKey,
+      fingerprint,
+    );
+
+    if (cachedAnalysis) {
+      return cachedAnalysis;
+    }
+
     const analysis = await this.openAiService.generateContributionAnalysis({
       recentMessages: normalizedMessages.map(
         (message) => `${message.nickname}: ${message.content}`,
       ),
+      participantNicknames: roster.participantNicknames,
       participantMessageCounts,
     });
-
-    return {
-      groupId: participant.groupId,
+    const response = {
+      groupId: roster.groupId,
       summary: analysis.summary,
-      members: analysis.members.map(
+      members: this.mergeContributionMembers(
+        roster.participantNicknames,
+        analysis,
+      ).map(
         (member): ChatContributionMemberDto => ({
           nickname: member.nickname,
           contributionScore: member.contributionScore,
@@ -185,11 +262,115 @@ export class ChatService {
         }),
       ),
     };
+
+    this.setCachedResponse(
+      this.contributionAnalysisCache,
+      cacheKey,
+      fingerprint,
+      response,
+    );
+
+    return response;
   }
 
-  private toContributionLevel(
-    score: number,
-  ): 'high' | 'medium' | 'low' {
+  private buildParticipantMessageCounts(
+    participantNicknames: string[],
+    messages: ChatMessage[],
+  ): Record<string, number> {
+    const counts = Object.fromEntries(
+      participantNicknames.map((nickname) => [nickname, 0]),
+    ) as Record<string, number>;
+
+    for (const message of messages) {
+      counts[message.nickname] = (counts[message.nickname] ?? 0) + 1;
+    }
+
+    return counts;
+  }
+
+  private mergeContributionMembers(
+    participantNicknames: string[],
+    analysis: GeneratedContributionAnalysis,
+  ): GeneratedContributionAnalysis['members'] {
+    const analysisByNickname = new Map(
+      analysis.members.map((member) => [member.nickname, member]),
+    );
+
+    return participantNicknames.map((nickname) => {
+      const analyzedMember = analysisByNickname.get(nickname);
+
+      if (analyzedMember) {
+        return analyzedMember;
+      }
+
+      return {
+        nickname,
+        contributionScore: 0,
+        contributionTypes: [],
+        reason:
+          '최근 대화에서 뚜렷한 기여 근거가 적었습니다. 더 많은 발화와 역할 참여가 필요합니다.',
+      };
+    });
+  }
+
+  private enforceAiRateLimit(
+    key: string,
+    limits: { windowMs: number; maxRequests: number },
+  ): void {
+    const now = Date.now();
+    const history = this.aiRequestHistory.get(key) ?? [];
+    const recentHistory = history.filter(
+      (timestamp) => now - timestamp < limits.windowMs,
+    );
+
+    if (recentHistory.length >= limits.maxRequests) {
+      throw new HttpException(
+        'AI 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    recentHistory.push(now);
+    this.aiRequestHistory.set(key, recentHistory);
+  }
+
+  private getCachedResponse<T>(
+    cache: Map<string, AiCacheEntry<T>>,
+    key: string,
+    fingerprint: string,
+  ): T | null {
+    const cachedEntry = cache.get(key);
+
+    if (!cachedEntry) {
+      return null;
+    }
+
+    if (cachedEntry.expiresAt <= Date.now()) {
+      cache.delete(key);
+      return null;
+    }
+
+    if (cachedEntry.fingerprint !== fingerprint) {
+      return null;
+    }
+
+    return cachedEntry.value;
+  }
+
+  private setCachedResponse<T>(
+    cache: Map<string, AiCacheEntry<T>>,
+    key: string,
+    fingerprint: string,
+    value: T,
+  ): void {
+    cache.set(key, {
+      fingerprint,
+      value,
+      expiresAt: Date.now() + AI_CACHE_TTL_MS,
+    });
+  }
+
+  private toContributionLevel(score: number): 'high' | 'medium' | 'low' {
     if (score >= 70) {
       return 'high';
     }

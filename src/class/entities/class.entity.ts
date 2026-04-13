@@ -2,10 +2,13 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
+  ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { User } from '../../auth/signup/entities/user.entity';
 import { Group } from '../../group/entities/group.entity';
 import { ClassParticipant } from './class-participant.entity';
 
@@ -31,6 +34,10 @@ export class Classroom {
 
   @UpdateDateColumn()
   updatedAt!: Date;
+
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'teacher_id' })
+  teacher?: User;
 
   @OneToMany(
     () => ClassParticipant,

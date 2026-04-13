@@ -9,7 +9,9 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { UserRole } from '../auth/signup/enums/user-role.enum';
 import { ApiErrorResponses } from '../common/decorators/api-error-responses.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { ChatContributionAnalysisRequestDto } from './dto/chat-contribution-analysis.request.dto';
 import { ChatContributionAnalysisResponseDto } from './dto/chat-contribution-analysis.response.dto';
 import { ChatInterventionAdviceRequestDto } from './dto/chat-intervention-advice.request.dto';
@@ -60,6 +62,7 @@ export class ChatController {
   }
 
   @Post('contribution-analysis')
+  @Roles(UserRole.TEACHER)
   @ApiOperation({
     summary: '그룹 대화 기여도 분석',
     description:

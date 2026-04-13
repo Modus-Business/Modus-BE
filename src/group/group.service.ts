@@ -78,6 +78,10 @@ export class GroupService {
       studentIds,
     );
 
+    if (participants.length > 0) {
+      await this.ensureClassScopedNicknames(request.classId, participants);
+    }
+
     const group = this.groupRepository.create({
       classId: request.classId,
       name: request.name.trim(),
@@ -90,11 +94,7 @@ export class GroupService {
     );
 
     if (participants.length > 0) {
-      await this.addParticipantsToGroup(
-        savedGroup.groupId,
-        request.classId,
-        participants,
-      );
+      await this.addParticipantsToGroup(savedGroup.groupId, participants);
     }
 
     return {
@@ -140,6 +140,14 @@ export class GroupService {
       )
       .map((classParticipant) => classParticipant.classParticipantId);
 
+    const participantsToAdd = participants.filter((classParticipant) =>
+      participantIdsToAdd.includes(classParticipant.classParticipantId),
+    );
+
+    if (participantsToAdd.length > 0) {
+      await this.ensureClassScopedNicknames(group.classId, participantsToAdd);
+    }
+
     await this.releaseParticipantsFromOtherGroups(participantIdsToAdd, groupId);
 
     const membersToRemove = currentMembers.filter(
@@ -151,14 +159,9 @@ export class GroupService {
       await this.groupMemberRepository.remove(membersToRemove);
     }
 
-    const participantsToAdd = participants.filter((classParticipant) =>
-      participantIdsToAdd.includes(classParticipant.classParticipantId),
-    );
-
     if (participantsToAdd.length > 0) {
       await this.addParticipantsToGroup(
         groupId,
-        group.classId,
         participantsToAdd,
       );
     }
@@ -325,6 +328,55 @@ export class GroupService {
     ];
   }
 
+  async getGroupAnalysisRoster(
+    currentUser: JwtPayload,
+    groupId: string,
+  ): Promise<{ groupId: string; participantNicknames: string[] }> {
+    const group = await this.getGroupWithMembers(groupId);
+
+    if (currentUser.role === UserRole.TEACHER) {
+      if (group.classroom.teacherId !== currentUser.sub) {
+        throw new ForbiddenException(
+          '본인 수업의 그룹만 분석할 수 있습니다.',
+        );
+      }
+    } else if (currentUser.role === UserRole.STUDENT) {
+      const isMember = group.groupMembers.some(
+        (groupMember) => groupMember.classParticipant.studentId === currentUser.sub,
+      );
+
+      if (!isMember) {
+        throw new ForbiddenException('본인이 속한 그룹만 분석할 수 있습니다.');
+      }
+    } else {
+      throw new ForbiddenException('학생 또는 교강사만 그룹 분석을 사용할 수 있습니다.');
+    }
+
+    return {
+      groupId: group.groupId,
+      participantNicknames: group.groupMembers.map((groupMember) =>
+        groupMember.classParticipant.groupNickname?.nickname ??
+        groupMember.classParticipant.student.name,
+      ),
+    };
+  }
+
+  async getTeacherContributionRoster(
+    currentUser: JwtPayload,
+    groupId: string,
+  ): Promise<{ groupId: string; participantNicknames: string[] }> {
+    const group = await this.getTeacherOwnedGroup(currentUser, groupId);
+    const groupWithMembers = await this.getGroupWithMembers(group.groupId);
+
+    return {
+      groupId: group.groupId,
+      participantNicknames: groupWithMembers.groupMembers.map((groupMember) =>
+        groupMember.classParticipant.groupNickname?.nickname ??
+        groupMember.classParticipant.student.name,
+      ),
+    };
+  }
+
   async getMyGroupNickname(
     currentUser: JwtPayload,
     groupId: string,
@@ -406,7 +458,6 @@ export class GroupService {
 
   private async addParticipantsToGroup(
     groupId: string,
-    classId: string,
     participants: ClassParticipant[],
   ): Promise<void> {
     const groupMembers = participants.map((classParticipant) =>
@@ -417,7 +468,6 @@ export class GroupService {
     );
 
     await this.groupMemberRepository.save(groupMembers);
-    await this.ensureClassScopedNicknames(classId, participants);
   }
 
   private async ensureClassScopedNicknames(
