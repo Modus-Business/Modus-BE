@@ -51,11 +51,19 @@ export type GeneratedContributionAnalysis = {
   }>;
 };
 
+type ResponseRequestParams<T> = {
+  instructions: string[];
+  userPayload: unknown;
+  parser: (outputText: string) => T;
+  fallbackErrorMessage: string;
+  timeoutMs: number;
+  maxRetries: number;
+  maxOutputTokens: number;
+};
+
 @Injectable()
 export class OpenAiService {
   private static readonly DEFAULT_MODEL = 'gpt-5-nano';
-  private static readonly REQUEST_TIMEOUT_MS = 15_000;
-  private static readonly MAX_RETRIES = 2;
 
   constructor(private readonly configService: ConfigService) {}
 
@@ -83,9 +91,12 @@ export class OpenAiService {
         },
         attemptedNicknames: params.attemptedNicknames,
       },
+      parser: (outputText) => this.parseNicknameResponse(outputText),
       fallbackErrorMessage:
         'OpenAI 응답 생성에 실패해 닉네임을 생성할 수 없습니다.',
-      parser: (outputText) => this.parseNicknameResponse(outputText),
+      timeoutMs: 5000,
+      maxRetries: 0,
+      maxOutputTokens: 80,
     });
   }
 
@@ -93,25 +104,37 @@ export class OpenAiService {
     content: string;
     recentMessages: string[];
   }): Promise<GeneratedMessageAdvice> {
-    return this.requestStructuredResponse({
-      instructions: [
-        '너는 학생 협업 서비스의 전송 전 문장 조언기다.',
-        '입력 문장이 상대에게 상처를 줄 가능성을 판단하고 필요하면 부드러운 수정 제안을 하라.',
-        '정책 위반 수준이 아니라면 무조건 차단하지 말고 수정 제안을 우선하라.',
-        '출력은 JSON 객체 하나만 반환하라.',
-        '형식은 {"riskLevel":"low|medium|high","shouldBlock":boolean,"warning":"...","suggestedRewrite":"..."|null} 이다.',
-        'warning은 40자 이내의 한국어 한 문장으로 작성하라.',
-        'suggestedRewrite는 원래 의미를 유지하면서 40자 이내의 한국어 한 문장으로 제안하라.',
-        '문제가 거의 없으면 shouldBlock=false, riskLevel=low, suggestedRewrite=null 로 반환하라.',
-      ],
-      userPayload: {
-        content: params.content,
-        recentMessages: params.recentMessages,
-      },
-      fallbackErrorMessage:
-        'OpenAI 응답 생성에 실패해 메시지 조언을 만들 수 없습니다.',
-      parser: (outputText) => this.parseMessageAdviceResponse(outputText),
-    });
+    try {
+      return await this.requestStructuredResponse({
+        instructions: [
+          '너는 학생 협업 서비스의 전송 전 문장 조언기다.',
+          '입력 문장이 상대에게 상처를 줄 가능성을 판단하고 필요하면 부드러운 수정 제안을 하라.',
+          '정책 위반 수준이 아니라면 무조건 차단하지 말고 수정 제안을 우선하라.',
+          '출력은 JSON 객체 하나만 반환하라.',
+          '형식은 {"riskLevel":"low|medium|high","shouldBlock":boolean,"warning":"...","suggestedRewrite":"..."|null} 이다.',
+          'warning은 40자 이내의 한국어 한 문장으로 작성하라.',
+          'suggestedRewrite는 원래 의미를 유지하면서 40자 이내의 한국어 한 문장으로 제안하라.',
+          '문제가 거의 없으면 shouldBlock=false, riskLevel=low, suggestedRewrite=null 로 반환하라.',
+        ],
+        userPayload: {
+          content: params.content,
+          recentMessages: params.recentMessages,
+        },
+        parser: (outputText) => this.parseMessageAdviceResponse(outputText),
+        fallbackErrorMessage:
+          'OpenAI 응답 생성에 실패해 메시지 조언을 만들 수 없습니다.',
+        timeoutMs: 3500,
+        maxRetries: 0,
+        maxOutputTokens: 80,
+      });
+    } catch {
+      return {
+        riskLevel: 'low',
+        shouldBlock: false,
+        warning: '표현을 한 번 더 확인해 보세요.',
+        suggestedRewrite: null,
+      };
+    }
   }
 
   async generateInterventionAdvice(params: {
@@ -119,28 +142,40 @@ export class OpenAiService {
     participantNicknames: string[];
     participantMessageCounts: Record<string, number>;
   }): Promise<GeneratedInterventionAdvice> {
-    return this.requestStructuredResponse({
-      instructions: [
-        '너는 학생 협업 서비스의 그룹 대화 퍼실리테이터다.',
-        '최근 대화를 분석해 참여를 넓히거나 논의를 더 깊게 만들 개입이 필요한지 판단하라.',
-        '특정 사용자를 공개적으로 소외되었다고 지목하지 마라.',
-        'participantNicknames에 있는 사람 중 최근 발화가 없는 사람도 반드시 고려하라.',
-        '개입이 필요하면 전체 그룹에게 자연스럽게 던질 짧은 한국어 메시지 한 문장을 제안하라.',
-        '출력은 JSON 객체 하나만 반환하라.',
-        '형식은 {"interventionNeeded":boolean,"interventionType":"none|participation|deep_question|stalled_discussion","reason":"...","suggestedMessage":"..."|null} 이다.',
-        'reason은 40자 이내의 한국어 한 문장으로 작성하라.',
-        'suggestedMessage는 40자 이내의 한국어 한 문장으로 작성하라.',
-        '대화가 충분히 건강하고 활발하면 interventionNeeded=false, interventionType="none", suggestedMessage=null 로 반환하라.',
-      ],
-      userPayload: {
-        recentMessages: params.recentMessages,
-        participantNicknames: params.participantNicknames,
-        participantMessageCounts: params.participantMessageCounts,
-      },
-      fallbackErrorMessage:
-        'OpenAI 응답 생성에 실패해 대화 개입 조언을 만들 수 없습니다.',
-      parser: (outputText) => this.parseInterventionAdviceResponse(outputText),
-    });
+    try {
+      return await this.requestStructuredResponse({
+        instructions: [
+          '너는 학생 협업 서비스의 그룹 대화 퍼실리테이터다.',
+          '최근 대화를 분석해 참여를 넓히거나 논의를 더 깊게 만들 개입이 필요한지 판단하라.',
+          '특정 사용자를 공개적으로 소외되었다고 지목하지 마라.',
+          'participantNicknames에 있는 사람 중 최근 발화가 없는 사람도 반드시 고려하라.',
+          '개입이 필요하면 전체 그룹에게 자연스럽게 던질 짧은 한국어 메시지 한 문장을 제안하라.',
+          '출력은 JSON 객체 하나만 반환하라.',
+          '형식은 {"interventionNeeded":boolean,"interventionType":"none|participation|deep_question|stalled_discussion","reason":"...","suggestedMessage":"..."|null} 이다.',
+          'reason은 40자 이내의 한국어 한 문장으로 작성하라.',
+          'suggestedMessage는 40자 이내의 한국어 한 문장으로 작성하라.',
+          '대화가 충분히 건강하고 활발하면 interventionNeeded=false, interventionType="none", suggestedMessage=null 로 반환하라.',
+        ],
+        userPayload: {
+          recentMessages: params.recentMessages,
+          participantNicknames: params.participantNicknames,
+          participantMessageCounts: params.participantMessageCounts,
+        },
+        parser: (outputText) => this.parseInterventionAdviceResponse(outputText),
+        fallbackErrorMessage:
+          'OpenAI 응답 생성에 실패해 대화 개입 조언을 만들 수 없습니다.',
+        timeoutMs: 3500,
+        maxRetries: 0,
+        maxOutputTokens: 100,
+      });
+    } catch {
+      return {
+        interventionNeeded: false,
+        interventionType: 'none',
+        reason: '현재는 별도 개입 없이 진행해도 괜찮아요.',
+        suggestedMessage: null,
+      };
+    }
   }
 
   async generateContributionAnalysis(params: {
@@ -148,40 +183,53 @@ export class OpenAiService {
     participantNicknames: string[];
     participantMessageCounts: Record<string, number>;
   }): Promise<GeneratedContributionAnalysis> {
-    return this.requestStructuredResponse({
-      instructions: [
-        '너는 학생 협업 서비스의 기여도 분석 보조기다.',
-        '메시지 수보다 역할과 실제 기여를 중심으로 최근 대화를 분석하라.',
-        'participantNicknames에 있는 모든 참여자를 반드시 결과에 포함하라.',
-        '최근 발화가 적거나 없더라도 members 배열에서 누락하지 마라.',
-        '역할은 initiator, idea_provider, questioner, summarizer, facilitator, executor만 사용하라.',
-        '메시지 개수만으로 높게 평가하지 말고 행동 기반으로만 판단하라.',
-        '성격 추정, 능력 평가, 도덕 판단은 금지한다.',
-        '출력은 JSON 객체 하나만 반환하라.',
-        '형식은 {"summary":"...","members":[{"nickname":"...","contributionScore":0,"contributionTypes":["..."],"reason":"..."}]} 이다.',
-        'summary는 2문장 이내의 한국어로 작성하라.',
-        '각 reason은 2~3문장의 한국어 설명으로 작성하라.',
-        '기여 근거가 약하면 contributionTypes는 빈 배열이어도 된다.',
-        'contributionTypes는 0개 이상 2개 이하로 제한하라.',
-        'contributionScore는 0~100 정수로 반환하라.',
-      ],
-      userPayload: {
-        recentMessages: params.recentMessages,
-        participantNicknames: params.participantNicknames,
-        participantMessageCounts: params.participantMessageCounts,
-      },
-      fallbackErrorMessage:
-        'OpenAI 응답 생성에 실패해 기여도 분석을 만들 수 없습니다.',
-      parser: (outputText) => this.parseContributionAnalysisResponse(outputText),
-    });
+    try {
+      return await this.requestStructuredResponse({
+        instructions: [
+          '너는 학생 협업 서비스의 기여도 분석 보조기다.',
+          '메시지 수보다 역할과 실제 기여를 중심으로 최근 대화를 분석하라.',
+          'participantNicknames에 있는 모든 참여자를 반드시 결과에 포함하라.',
+          '최근 발화가 적거나 없더라도 members 배열에서 누락하지 마라.',
+          '역할은 initiator, idea_provider, questioner, summarizer, facilitator, executor만 사용하라.',
+          '메시지 개수만으로 높게 평가하지 말고 행동 기반으로만 판단하라.',
+          '성격 추정, 능력 평가, 도덕 판단은 금지한다.',
+          '출력은 JSON 객체 하나만 반환하라.',
+          '형식은 {"summary":"...","members":[{"nickname":"...","contributionScore":0,"contributionTypes":["..."],"reason":"..."}]} 이다.',
+          'summary는 2문장 이내의 한국어로 작성하라.',
+          '각 reason은 2~3문장의 한국어 설명으로 작성하라.',
+          '기여 근거가 약하면 contributionTypes는 빈 배열이어도 된다.',
+          'contributionTypes는 0개 이상 2개 이하로 제한하라.',
+          'contributionScore는 0~100 정수로 반환하라.',
+        ],
+        userPayload: {
+          recentMessages: params.recentMessages,
+          participantNicknames: params.participantNicknames,
+          participantMessageCounts: params.participantMessageCounts,
+        },
+        parser: (outputText) => this.parseContributionAnalysisResponse(outputText),
+        fallbackErrorMessage:
+          'OpenAI 응답 생성에 실패해 기여도 분석을 만들 수 없습니다.',
+        timeoutMs: 5000,
+        maxRetries: 0,
+        maxOutputTokens: 320,
+      });
+    } catch {
+      return {
+        summary: '최근 대화 기준으로 기여도를 빠르게 정리했습니다.',
+        members: params.participantNicknames.map((nickname) => ({
+          nickname,
+          contributionScore: 0,
+          contributionTypes: [],
+          reason:
+            '분석 응답이 지연되어 기본값으로 표시했습니다. 최근 대화 기준 추가 확인이 필요합니다.',
+        })),
+      };
+    }
   }
 
-  private async requestStructuredResponse<T>(params: {
-    instructions: string[];
-    userPayload: unknown;
-    fallbackErrorMessage: string;
-    parser: (outputText: string) => T;
-  }): Promise<T> {
+  private async requestStructuredResponse<T>(
+    params: ResponseRequestParams<T>,
+  ): Promise<T> {
     const apiKey = this.configService.get<string>('OPENAI_API_KEY')?.trim();
 
     if (!apiKey) {
@@ -194,12 +242,9 @@ export class OpenAiService {
       this.configService.get<string>('OPENAI_MODEL')?.trim() ??
       OpenAiService.DEFAULT_MODEL;
 
-    for (let attempt = 0; attempt <= OpenAiService.MAX_RETRIES; attempt += 1) {
+    for (let attempt = 0; attempt <= params.maxRetries; attempt += 1) {
       const controller = new AbortController();
-      const timeout = setTimeout(
-        () => controller.abort(),
-        OpenAiService.REQUEST_TIMEOUT_MS,
-      );
+      const timeout = setTimeout(() => controller.abort(), params.timeoutMs);
 
       try {
         const response = await fetch('https://api.openai.com/v1/responses', {
@@ -211,6 +256,7 @@ export class OpenAiService {
           signal: controller.signal,
           body: JSON.stringify({
             model,
+            max_output_tokens: params.maxOutputTokens,
             input: [
               {
                 role: 'developer',
@@ -237,7 +283,7 @@ export class OpenAiService {
 
         if (!response.ok) {
           if (
-            attempt < OpenAiService.MAX_RETRIES &&
+            attempt < params.maxRetries &&
             this.shouldRetryStatus(response.status)
           ) {
             continue;
@@ -250,10 +296,7 @@ export class OpenAiService {
 
         return params.parser(this.extractOutputText(data).trim());
       } catch (error) {
-        if (
-          attempt < OpenAiService.MAX_RETRIES &&
-          this.shouldRetryError(error)
-        ) {
+        if (attempt < params.maxRetries && this.shouldRetryError(error)) {
           continue;
         }
 
@@ -328,10 +371,7 @@ export class OpenAiService {
       );
     }
 
-    return {
-      nickname,
-      reason,
-    };
+    return { nickname, reason };
   }
 
   private parseMessageAdviceResponse(

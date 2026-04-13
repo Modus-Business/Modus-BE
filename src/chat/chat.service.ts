@@ -25,7 +25,11 @@ import { ChatMessageResponseDto } from './dto/chat-message.response.dto';
 import { ChatMessage } from './entities/chat-message.entity';
 
 const CHAT_HISTORY_LIMIT = 50;
-const AI_CACHE_TTL_MS = 30_000;
+const MESSAGE_ADVICE_RECENT_LIMIT = 3;
+const INTERVENTION_RECENT_LIMIT = 8;
+const CONTRIBUTION_RECENT_LIMIT = 12;
+const MESSAGE_ADVICE_CACHE_TTL_MS = 15_000;
+const ANALYSIS_CACHE_TTL_MS = 180_000;
 const AI_RATE_LIMIT_BUCKETS = {
   messageAdvice: { windowMs: 30_000, maxRequests: 8 },
   interventionAdvice: { windowMs: 60_000, maxRequests: 6 },
@@ -41,6 +45,10 @@ type AiCacheEntry<T> = {
 @Injectable()
 export class ChatService {
   private readonly aiRequestHistory = new Map<string, number[]>();
+  private readonly messageAdviceCache = new Map<
+    string,
+    AiCacheEntry<ChatMessageAdviceResponseDto>
+  >();
   private readonly interventionAdviceCache = new Map<
     string,
     AiCacheEntry<ChatInterventionAdviceResponseDto>
@@ -112,22 +120,51 @@ export class ChatService {
     const recentMessages = await this.chatMessageRepository.find({
       where: { groupId: participant.groupId },
       order: { sentAt: 'DESC' },
-      take: 5,
+      take: MESSAGE_ADVICE_RECENT_LIMIT,
     });
+    const normalizedMessages = recentMessages.reverse();
+    const cacheKey = `message:${currentUser.sub}:${participant.groupId}`;
+    const fingerprint = JSON.stringify({
+      content: trimmedContent,
+      recentMessageIds: normalizedMessages.map((message) => message.messageId),
+      recentMessageContents: normalizedMessages.map((message) => message.content),
+    });
+    const cachedAdvice = this.getCachedResponse(
+      this.messageAdviceCache,
+      cacheKey,
+      fingerprint,
+    );
+
+    if (cachedAdvice) {
+      return cachedAdvice;
+    }
+
     const advice = await this.openAiService.generateMessageAdvice({
       content: trimmedContent,
-      recentMessages: recentMessages
-        .reverse()
-        .map((message) => `${message.nickname}: ${message.content}`),
+      recentMessages: normalizedMessages.map(
+        (message) => `${message.nickname}: ${message.content}`,
+      ),
     });
-
-    return {
+    const response = {
       groupId: participant.groupId,
       riskLevel: advice.riskLevel,
+      riskLevelLabel: this.toRiskLevelLabel(advice.riskLevel),
       shouldBlock: advice.shouldBlock,
+      shouldShowPopup: advice.shouldBlock || advice.riskLevel === 'high',
+      shouldSkip: advice.riskLevel === 'low' && advice.shouldBlock === false,
       warning: advice.warning,
       suggestedRewrite: advice.suggestedRewrite,
     };
+
+    this.setCachedResponse(
+      this.messageAdviceCache,
+      cacheKey,
+      fingerprint,
+      response,
+      MESSAGE_ADVICE_CACHE_TTL_MS,
+    );
+
+    return response;
   }
 
   async getInterventionAdvice(
@@ -146,7 +183,7 @@ export class ChatService {
     const recentMessages = await this.chatMessageRepository.find({
       where: { groupId: roster.groupId },
       order: { sentAt: 'DESC' },
-      take: 20,
+      take: INTERVENTION_RECENT_LIMIT,
     });
     const normalizedMessages = recentMessages.reverse();
     const participantMessageCounts = this.buildParticipantMessageCounts(
@@ -189,6 +226,7 @@ export class ChatService {
       cacheKey,
       fingerprint,
       response,
+      ANALYSIS_CACHE_TTL_MS,
     );
 
     return response;
@@ -214,7 +252,7 @@ export class ChatService {
     const recentMessages = await this.chatMessageRepository.find({
       where: { groupId: roster.groupId },
       order: { sentAt: 'DESC' },
-      take: 30,
+      take: CONTRIBUTION_RECENT_LIMIT,
     });
     const normalizedMessages = recentMessages.reverse();
     const participantMessageCounts = this.buildParticipantMessageCounts(
@@ -268,6 +306,7 @@ export class ChatService {
       cacheKey,
       fingerprint,
       response,
+      ANALYSIS_CACHE_TTL_MS,
     );
 
     return response;
@@ -362,11 +401,12 @@ export class ChatService {
     key: string,
     fingerprint: string,
     value: T,
+    ttlMs: number,
   ): void {
     cache.set(key, {
       fingerprint,
       value,
-      expiresAt: Date.now() + AI_CACHE_TTL_MS,
+      expiresAt: Date.now() + ttlMs,
     });
   }
 
@@ -380,6 +420,20 @@ export class ChatService {
     }
 
     return 'low';
+  }
+
+  private toRiskLevelLabel(
+    riskLevel: 'low' | 'medium' | 'high',
+  ): '낮음' | '중간' | '높음' {
+    if (riskLevel === 'high') {
+      return '높음';
+    }
+
+    if (riskLevel === 'medium') {
+      return '중간';
+    }
+
+    return '낮음';
   }
 
   private toResponse(message: ChatMessage): ChatMessageResponseDto {

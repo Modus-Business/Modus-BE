@@ -7,8 +7,17 @@ export class ChatMessageAdviceResponseDto {
   @ApiProperty({ example: 'medium', enum: ['low', 'medium', 'high'] })
   riskLevel!: 'low' | 'medium' | 'high';
 
+  @ApiProperty({ example: '중간', enum: ['낮음', '중간', '높음'] })
+  riskLevelLabel!: '낮음' | '중간' | '높음';
+
   @ApiProperty({ example: false })
   shouldBlock!: boolean;
+
+  @ApiProperty({ example: false })
+  shouldShowPopup!: boolean;
+
+  @ApiProperty({ example: false })
+  shouldSkip!: boolean;
 
   @ApiProperty({
     example: '이 표현은 조금 강하게 들릴 수 있어요',
